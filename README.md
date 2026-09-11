@@ -1,23 +1,110 @@
 # AegisFlow
 
-**IEEE Response Quest Challenge — submission #5395**  
+**IEEE Response Quest Challenge — submission #5395** (Impact Challenge Product, wildfire / WUI).  
 Real-time multi-agent data fusion for wildfire situational awareness.
 
-> **Status:** Architecture / planning. Implementation starts only after Jaime approves the Notion architecture.
+Stage 1 is a working Next.js Ops foundation: one map-first dashboard, shared event IDs, thin FIRMS + mock wind adapters, three agent stubs, and Clerk RBAC (or a flagged DEV bypass). Architecture approved by Jaime (2026-09-10).
 
-## Docs (Notion)
+## Problem
 
-- [Project hub row](https://app.notion.com/p/3d5825c9c7b7816aa059d4795175d7fb)
+Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citizen reports) while fire moves in minutes. AegisFlow fuses those streams and runs specialized agents that produce a single-pane map, executive summary, and prescriptive dispatch — with lineage plus PII scrubbing so recommendations are accountable.
+
+## Architecture (locked)
+
+| Layer | Stage 1 |
+| --- | --- |
+| Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. |
+| Ingest | NASA **FIRMS** hotspots (live or fixture) + **mock wind**. One feed can fail without blanking Ops. |
+| Agents | Fire propagation · Evacuation logistics · Resource allocation. OpenAI primary / DeepSeek backup **stubs**. |
+| Runtime | **Modal-ready** worker stub (`workers/modal_stub.py`); runs locally for the demo. |
+| UI | **One** Next.js Ops dashboard (dark ops). Map ~60–70% width. No Replit second map. No live Fabric map. |
+| IDs | Shared `eventId` + `schemaVersion` for Ops **and** a future Fabric twin. See [`docs/event-schema.md`](docs/event-schema.md). |
+| RF / mesh | Labeled **SIM** only. No live RF. |
+
+Demo region is a **Cascade Range / Sisters / Hwy 20 placeholder** until Jaime picks the contest narrative.
+
+### Notion
+
+- [Project hub](https://app.notion.com/p/3d5825c9c7b7816aa059d4795175d7fb)
 - [Architecture](https://app.notion.com/p/3d5825c9c7b78104a395c1b4bb1fb960)
+- [Design — Ops UI & judge surfaces](https://app.notion.com/p/3d8825c9c7b7810fa159e2b8094a0cdf)
+- [QA — Test bar & judge demo script](https://app.notion.com/p/3d8825c9c7b78155bec5fa727274a80e)
 - [First steps & build plan](https://app.notion.com/p/3d5825c9c7b7813d90a7fa489e2e2352)
 - [Credits & capability map](https://app.notion.com/p/3d5825c9c7b78129b95ce8133bf0c897)
 
-## Layers (summary)
+## How to run (QA smoke)
 
-1. **Ingestion** — NASA FIRMS, IoT wind/weather, drone IR, cams, crowdsourced (PII scrubbed)
-2. **Multi-agent reasoning** — Fire propagation · Evacuation logistics · Resource allocation (+ RAG + lineage)
-3. **Command UI** — Single-pane Ops dashboard (map, exec summary, dispatch)
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-## Repo policy
+Open [http://localhost:3000/ops](http://localhost:3000/ops). Empty Clerk keys enable the DEV bypass so the dashboard still loads. Sign-in is `/sign-in` (after auth, Clerk redirects to `/ops`).
 
-No app code in this repo until architecture is approved. Secrets never committed.
+```bash
+npm run build
+npm test
+python3 workers/modal_stub.py
+```
+
+Without API keys, Ops loads the **AegisFire-01** fixture (map, exec summary, lineage chips, dispatch, resource bars, timeline).
+
+| Check | URL |
+| --- | --- |
+| Ops dashboard | http://localhost:3000/ops |
+| Viewer (bypass) | http://localhost:3000/ops?role=viewer |
+| Clerk sign-in | http://localhost:3000/sign-in |
+| Fabric twin (same IDs, no map) | http://localhost:3000/fabric |
+| Incident JSON | http://localhost:3000/api/ops/incident |
+
+## Clerk roles
+
+1. Create an application at [dashboard.clerk.com](https://dashboard.clerk.com) and copy `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` plus `CLERK_SECRET_KEY` into `.env.local`.
+2. Open the user in Clerk → **Public metadata** → set:
+
+```json
+{ "role": "manager" }
+```
+
+or `{ "role": "viewer" }`. Any other or missing value is treated as **viewer**.
+
+3. Sign-in / sign-up routes are `/sign-in` and `/sign-up`.
+
+### DEV bypass (non-prod)
+
+If Clerk keys are missing, middleware does not protect routes and a **DEV BYPASS · NON-PROD** banner is shown. Default bypass role is `manager`. Override with `AEGISFLOW_DEV_ROLE=viewer` or `/ops?role=viewer`. Use this for local QA only — not for a judged production deploy.
+
+## Environment
+
+See [`.env.example`](.env.example). Secrets are gitignored.
+
+| Variable | Purpose |
+| --- | --- |
+| `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. |
+| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. |
+| `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
+| `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
+| `AEGISFLOW_LIVE_LLM` | Must be `true` before any live LLM path is used (still a stub in Stage 1). |
+
+## Repo layout
+
+```
+src/app/                 /ops dashboard + /fabric twin + /sign-in + /api/ops/incident
+src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lineage drawer
+src/lib/schema/          Zod + JSON Schema + eventId helpers
+src/lib/ingest/          firms.ts · wind.ts
+src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
+src/lib/pii.ts           crowdsource scrubber
+fixtures/aegisfire-01.json
+docs/event-schema.md
+workers/modal_stub.py
+```
+
+## IEEE originality
+
+AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, wind, and agent payloads are synthetic fixtures for the Cascade Range placeholder.
+
+## Secrets
+
+Do not commit Clerk, FIRMS, OpenAI, DeepSeek, or Modal keys. `.env.local` stays on the machine.
