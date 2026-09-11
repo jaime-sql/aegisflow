@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --ops-bg: #0b1220;
+  --ops-panel: #121a2b;
+  --ops-panel-2: #162033;
+  --ops-border: #1e2a40;
+  --ops-text: #e8eef9;
+  --ops-muted: #8b9bb8;
+  --ops-fire: #ff4d2e;
+  --ops-fire-2: #ffb020;
+  --ops-cyan: #3db9ff;
+  --ops-ok: #3ddc97;
+  --ops-warn: #ffb020;
+  --ops-down: #ff5c5c;
+  --ops-corridor: #3ddc97;
+  --background: var(--ops-bg);
+  --foreground: var(--ops-text);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ops-bg: var(--ops-bg);
+  --color-ops-panel: var(--ops-panel);
+  --color-ops-border: var(--ops-border);
+  --color-ops-muted: var(--ops-muted);
+  --color-ops-fire: var(--ops-fire);
+  --color-ops-cyan: var(--ops-cyan);
+  --color-ops-ok: var(--ops-ok);
+  --color-ops-warn: var(--ops-warn);
+  --color-ops-down: var(--ops-down);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.ops-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.ops-scroll::-webkit-scrollbar-thumb {
+  background: #243044;
+  border-radius: 99px;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #0b1220;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  background: #121a2b;
+  color: #e8eef9;
+}
+.leaflet-popup-tip {
+  background: #121a2b;
+}
+.leaflet-control-attribution {
+  background: rgba(11, 18, 32, 0.75) !important;
+  color: #8b9bb8 !important;
+}
+.leaflet-control-attribution a {
+  color: #3db9ff !important;
+}
+.ops-dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05) saturate(0.35);
+}
