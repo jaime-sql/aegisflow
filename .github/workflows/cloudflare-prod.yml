@@ -53,7 +53,9 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
 
-      - name: Confirm /aegisflow is inlined
+      - name: Confirm /aegisflow and Clerk publishable key are inlined
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           if ! grep -R -F -q "/aegisflow" .next; then
@@ -61,6 +63,19 @@ jobs:
             exit 1
           fi
           echo "basePath /aegisflow is present in the Next.js build."
+          # Client + middleware need the publishable key inlined; do not print it.
+          case "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" in
+            pk_test_*|pk_live_*) ;;
+            *)
+              echo "::error::NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY must start with pk_test_ or pk_live_."
+              exit 1
+              ;;
+          esac
+          if ! grep -R -E -q --binary-files=without-match 'pk_(test|live)_' .next; then
+            echo "::error::Publishable Clerk key was not inlined into the Next.js build."
+            exit 1
+          fi
+          echo "Clerk publishable key prefix is present in the Next.js build."
 
       - name: OpenNext Cloudflare adapter
         run: npx opennextjs-cloudflare build
@@ -79,8 +94,10 @@ jobs:
           command: deploy
           secrets: |
             CLERK_SECRET_KEY
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy path Worker
         uses: cloudflare/wrangler-action@v3

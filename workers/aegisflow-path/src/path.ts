@@ -1,5 +1,13 @@
 export const PROD_BASE_PATH = "/aegisflow";
 
+/** Dead Pages preview + workers.dev — rewrite these hosts onto the public origin. */
+export function isPreviewHost(hostname: string): boolean {
+  return (
+    hostname === "aegisflow.pages.dev" ||
+    (hostname.startsWith("aegisflow.") && hostname.endsWith(".workers.dev"))
+  );
+}
+
 export function isAppPath(pathname: string, basePath = PROD_BASE_PATH): boolean {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);
 }
@@ -12,7 +20,6 @@ export function originPath(pathname: string): string {
 export function rewriteLocation(
   location: string,
   requestUrl: URL,
-  pagesOrigin: string,
   basePath = PROD_BASE_PATH,
 ): string {
   let parsed: URL;
@@ -22,16 +29,15 @@ export function rewriteLocation(
     return location;
   }
 
-  const pages = new URL(pagesOrigin);
-  const isPagesHost = parsed.hostname === pages.hostname;
+  const isLegacyPreview = isPreviewHost(parsed.hostname);
   const isPublicHost = parsed.hostname === requestUrl.hostname;
 
-  if (!isPagesHost && !isPublicHost && parsed.origin !== requestUrl.origin) {
+  if (!isLegacyPreview && !isPublicHost && parsed.origin !== requestUrl.origin) {
     return location;
   }
 
   let path = parsed.pathname;
-  if (isPagesHost && !isAppPath(path, basePath)) {
+  if (isLegacyPreview && !isAppPath(path, basePath)) {
     path = path === "/" ? basePath : `${basePath}${path.startsWith("/") ? path : `/${path}`}`;
   } else if (!isAppPath(path, basePath) && path !== "/") {
     path = `${basePath}${path.startsWith("/") ? path : `/${path}`}`;

@@ -19,5 +19,20 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "aegisflow"
     }
-  ]
+  ],
+  // Non-secret runtime env. OpenNext middleware / RSC read process.env here;
+  // next.config.ts inlines the same values at build. Clerk keys are Worker
+  // secrets (see cloudflare-prod.yml), not vars.
+  "vars": {
+    "NEXTJS_ENV": "production",
+    "CLOUDFLARE_PROD": "true",
+    "BASE_PATH": "/aegisflow",
+    "NEXT_PUBLIC_BASE_PATH": "/aegisflow",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_URL": "/aegisflow/sign-in",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_URL": "/aegisflow/sign-up",
+    "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL": "/aegisflow/ops",
+    "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL": "/aegisflow/ops",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL": "/aegisflow/ops",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL": "/aegisflow/ops"
+  }
 }

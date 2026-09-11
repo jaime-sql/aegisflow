@@ -1,7 +1,6 @@
 import { isAppPath, originPath, rewriteLocation } from "./path";
 
 export interface PathRouterEnv {
-  PAGES_ORIGIN: string;
   BASE_PATH: string;
   PUBLIC_ORIGIN: string;
   /** Service binding to the OpenNext Worker named `aegisflow`. */
@@ -48,6 +47,16 @@ const worker = {
       });
     }
 
+    if (!env.AEGISFLOW) {
+      return new Response(
+        "AegisFlow path Worker is missing the AEGISFLOW service binding",
+        {
+          status: 502,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+        },
+      );
+    }
+
     const dest = new URL(url.href);
     dest.pathname = originPath(url.pathname);
 
@@ -61,33 +70,27 @@ const worker = {
       init.duplex = "half";
     }
 
-    // Prefer the OpenNext service binding so Clerk sees cortexmatter.com/aegisflow
-    // (Host + path) instead of a pages.dev/workers.dev preview host.
-    if (env.AEGISFLOW) {
-      const bound = await env.AEGISFLOW.fetch(new Request(dest.toString(), init));
-      return new Response(bound.body, {
-        status: bound.status,
-        statusText: bound.statusText,
-        headers: bound.headers,
-      });
-    }
-
-    dest.host = new URL(env.PAGES_ORIGIN).host;
-    dest.protocol = "https:";
-
-    const upstream = await fetch(dest, init);
-    const headers = new Headers(upstream.headers);
-    const location = headers.get("Location");
-    if (location) {
-      headers.set("Location", rewriteLocation(location, url, env.PAGES_ORIGIN, basePath));
-    }
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers,
+    // Service binding only. The empty Pages project (HTTP 522) is not a fallback.
+    const bound = await env.AEGISFLOW.fetch(new Request(dest.toString(), init));
+    return new Response(bound.body, {
+      status: bound.status,
+      statusText: bound.statusText,
+      headers: publicResponseHeaders(bound.headers, url, basePath),
     });
   },
 };
+
+function publicResponseHeaders(
+  incoming: Headers,
+  requestUrl: URL,
+  basePath: string,
+): Headers {
+  const headers = new Headers(incoming);
+  const location = headers.get("Location");
+  if (location) {
+    headers.set("Location", rewriteLocation(location, requestUrl, basePath));
+  }
+  return headers;
+}
 
 export default worker;

@@ -1,1 +1,3 @@
 NEXTJS_ENV=development
+# Copy to .dev.vars (gitignored). Clerk keys for `wrangler dev` / OpenNext preview
+# belong in .env.local — wrangler.jsonc already sets prod path vars (BASE_PATH).
