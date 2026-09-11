@@ -1,0 +1,90 @@
+name: Cloudflare Prod
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "prod-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-fund --no-audit
+      - run: npm test
+
+      - name: Check deploy secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::error::Repository Actions secret CLOUDFLARE_API_TOKEN is missing. Create a token with Cloudflare Pages + Workers edit on account 8a8c9483df8e8a2a9adec437a0994fe4. Agents often lack actions:write and cannot add this secret."
+            exit 1
+          fi
+          if [ -z "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}" ] || [ -z "${CLERK_SECRET_KEY:-}" ]; then
+            echo "::error::Repository Actions secrets NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY are required. Static export is not used because it would drop Clerk middleware; OpenNext needs the keys at build + runtime."
+            exit 1
+          fi
+          echo "Deploy secrets are present (values not printed)."
+
+      - name: Build Next.js with /aegisflow basePath
+        run: npm run build
+        env:
+          CLOUDFLARE_PROD: "true"
+          BASE_PATH: /aegisflow
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
+
+      - name: Confirm /aegisflow is inlined
+        run: |
+          set -euo pipefail
+          if ! grep -R -F -q "/aegisflow" .next; then
+            echo "::error::Built site does not contain /aegisflow. BASE_PATH was not applied."
+            exit 1
+          fi
+          echo "basePath /aegisflow is present in the Next.js build."
+
+      - name: OpenNext Cloudflare adapter
+        run: npx opennextjs-cloudflare build
+        env:
+          CLOUDFLARE_PROD: "true"
+          BASE_PATH: /aegisflow
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
+
+      - name: Deploy OpenNext Worker (project aegisflow)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '8a8c9483df8e8a2a9adec437a0994fe4' }}
+          command: deploy
+          secrets: |
+            CLERK_SECRET_KEY
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+
+      - name: Deploy path Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '8a8c9483df8e8a2a9adec437a0994fe4' }}
+          command: deploy --config workers/aegisflow-path/wrangler.jsonc

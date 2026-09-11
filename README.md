@@ -40,7 +40,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000/ops](http://localhost:3000/ops). Empty Clerk keys enable the DEV bypass so the dashboard still loads. Sign-in is `/sign-in` (after auth, Clerk redirects to `/ops`).
+Open [http://localhost:3000/ops](http://localhost:3000/ops). Empty Clerk keys enable the DEV bypass so the dashboard still loads. Sign-in is `/sign-in` (after auth, Clerk redirects to `/ops`). Local `basePath` is empty; production uses `/aegisflow` (see [Cloudflare production](#cloudflare-production-cortexmattercomaegisflow)).
 
 ```bash
 npm run build
@@ -69,7 +69,26 @@ Without API keys, Ops loads the **AegisFire-01** fixture (map, exec summary, lin
 
 or `{ "role": "viewer" }`. Any other or missing value is treated as **viewer**.
 
-3. Sign-in / sign-up routes are `/sign-in` and `/sign-up`.
+3. Sign-in / sign-up routes are `/sign-in` and `/sign-up` locally, or `/aegisflow/sign-in` and `/aegisflow/sign-up` in production.
+
+### Clerk on `/aegisflow` (production)
+
+`output: "export"` would drop `src/middleware.ts` (`clerkMiddleware` + `auth.protect()`), the `/api/ops/incident` route, and `currentUser()` on the Ops page. This app therefore deploys with **`@opennextjs/cloudflare`** (OpenNext Worker), not Rosario-style static Pages.
+
+In [Clerk Dashboard](https://dashboard.clerk.com) → the AegisFlow application → **Domains / Paths / Redirects**, add:
+
+| Setting | Value |
+| --- | --- |
+| Home / application URL | `https://cortexmatter.com/aegisflow` |
+| Sign-in | `https://cortexmatter.com/aegisflow/sign-in` |
+| Sign-up | `https://cortexmatter.com/aegisflow/sign-up` |
+| After sign-in | `https://cortexmatter.com/aegisflow/ops` |
+| After sign-up | `https://cortexmatter.com/aegisflow/ops` |
+| Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.pages.dev` |
+
+Do **not** point Clerk at `https://cortexmatter.com/` (apex). That URL is reserved for other apps.
+
+The Cloudflare prod workflow inlines `NEXT_PUBLIC_CLERK_*` paths with the `/aegisflow` prefix from `next.config.ts`. Local `.env.local` keeps the unprefixed `/sign-in` values.
 
 ### DEV bypass (non-prod)
 
@@ -81,7 +100,8 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 
 | Variable | Purpose |
 | --- | --- |
-| `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. |
+| `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. Prod paths are `/aegisflow/sign-in` etc. |
+| `BASE_PATH` / `CLOUDFLARE_PROD` | Prod `basePath` / `assetPrefix` = `/aegisflow`. Unset locally. |
 | `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
 | `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
@@ -93,13 +113,45 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 src/app/                 /ops dashboard + /fabric twin + /sign-in + /api/ops/incident
 src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lineage drawer
 src/lib/schema/          Zod + JSON Schema + eventId helpers
+src/lib/base-path.ts     env-driven `/aegisflow` prefix
 src/lib/ingest/          firms.ts · wind.ts
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
 src/lib/pii.ts           crowdsource scrubber
 fixtures/aegisfire-01.json
 docs/event-schema.md
 workers/modal_stub.py
+workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
+.github/workflows/cloudflare-prod.yml
 ```
+
+## Cloudflare production (`cortexmatter.com/aegisflow`)
+
+Locked prod URL: **https://cortexmatter.com/aegisflow**. The apex `cortexmatter.com/` stays free for other apps. The path Worker only claims `cortexmatter.com/aegisflow` and `cortexmatter.com/aegisflow/*`.
+
+Rosario can use static `output: "export"` because it has no middleware. AegisFlow cannot: Clerk `clerkMiddleware`, `auth.protect()`, `currentUser()`, `force-dynamic` Ops/Fabric pages, and `/api/ops/incident` need a Node-compatible Worker. **Adapter choice: `@opennextjs/cloudflare` (OpenNext)** deployed as Worker `aegisflow` (same name as the existing Pages project). Preview: `aegisflow.pages.dev` / `*.workers.dev`. Public traffic goes through Worker `aegisflow-path` via a service binding (HTTP fallback origin `https://aegisflow.pages.dev`). `npm run build` is webpack (not Turbopack) so OpenNext can emit a standalone Worker; `npm run dev` still uses Turbopack.
+
+`basePath` / `assetPrefix` become `/aegisflow` when `CLOUDFLARE_PROD=true` or `BASE_PATH=/aegisflow`. Leaflet marker images live under `public/leaflet/` so they load as `/aegisflow/leaflet/...`. Next.js `Link` / `redirect()` already prefix `basePath`; raw URLs use `withBasePath()`.
+
+### Jaime’s post-merge steps
+
+Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing). Jaime must do this in the GitHub UI:
+
+1. **Clerk Dashboard** — add the production URLs in the table above (sign-in, after-sign-in, allowed origins). Do not use the apex as the app home URL.
+2. **GitHub → Settings → Secrets and variables → Actions** on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow):
+   - `CLOUDFLARE_API_TOKEN` — Pages + Workers edit on account `8a8c9483df8e8a2a9adec437a0994fe4` (same token pattern as Rosario). Confirm this secret exists on **this** repo; it is not inherited from another project.
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - Optional: `FIRMS_MAP_KEY` (otherwise Ops uses the fixture). Set it as a Wrangler secret on Worker `aegisflow` if you want live FIRMS in prod.
+3. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow`, then deploys `workers/aegisflow-path`.
+4. **QA smoke**
+   - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
+   - `https://cortexmatter.com/aegisflow` → Ops (or Clerk sign-in, then `/aegisflow/ops`).
+   - Sign-in / sign-up stay under `/aegisflow/...`.
+   - Map tiles + `/aegisflow/_next/...` + `/aegisflow/leaflet/...` load.
+   - Viewer vs Manager still works (Clerk `publicMetadata.role`).
+   - Fabric twin: `https://cortexmatter.com/aegisflow/fabric`.
+
+Do not connect Cloudflare Git auto-deploy to `main` if you want promotion to stay manual (`workflow_dispatch` / `prod-*` tags), matching Rosario.
 
 ## IEEE originality
 
@@ -107,4 +159,4 @@ AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, w
 
 ## Secrets
 
-Do not commit Clerk, FIRMS, OpenAI, DeepSeek, or Modal keys. `.env.local` stays on the machine.
+Do not commit Clerk, FIRMS, OpenAI, DeepSeek, Modal, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` belong.
