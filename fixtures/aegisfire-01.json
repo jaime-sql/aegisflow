@@ -1,0 +1,380 @@
+{
+  "eventId": "evt_aegisfire01_incident",
+  "schemaVersion": "1.0.0",
+  "incidentId": "AegisFire-01",
+  "name": "AegisFire-01 · Sisters / Hwy 20 WUI",
+  "status": "active",
+  "region": {
+    "name": "Cascade Range — Sisters / Hwy 20 (placeholder until Jaime picks demo region)",
+    "placeholder": true,
+    "center": { "lat": 44.321, "lon": -121.548 },
+    "bbox": [-121.92, 44.12, -121.28, 44.52]
+  },
+  "startedAt": "2026-09-10T16:05:00.000Z",
+  "updatedAt": "2026-09-10T19:12:00.000Z",
+  "executiveSummary": "AegisFire-01 is a wind-driven timber/WUI fire west of Sisters, Oregon (Cascade Range placeholder). VIIRS hotspots and mock WSW winds (9–14 m/s) indicate 6-hour spread toward the Hwy 20 corridor. Three agents recommend holding DP-12, pre-staging eastbound evac on Hwy 20, and committing Type 3 engines plus a heavy tanker. Viewer role sees the same dispatch list locked. RF mesh row is SIM only.",
+  "hotspots": [
+    {
+      "eventId": "evt_aegisfire01_hotspot_01",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3042,
+      "lon": -121.6418,
+      "brightnessK": 367.4,
+      "confidence": "high",
+      "frpMw": 48.2,
+      "observedAt": "2026-09-10T18:54:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_02",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3111,
+      "lon": -121.6284,
+      "brightnessK": 354.1,
+      "confidence": "high",
+      "frpMw": 31.6,
+      "observedAt": "2026-09-10T18:54:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_03",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3188,
+      "lon": -121.612,
+      "brightnessK": 341.9,
+      "confidence": "nominal",
+      "frpMw": 18.4,
+      "observedAt": "2026-09-10T18:54:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_04",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3275,
+      "lon": -121.5988,
+      "brightnessK": 338.2,
+      "confidence": "nominal",
+      "frpMw": 12.1,
+      "observedAt": "2026-09-10T18:54:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_05",
+      "schemaVersion": "1.0.0",
+      "lat": 44.2926,
+      "lon": -121.6542,
+      "brightnessK": 349.0,
+      "confidence": "high",
+      "frpMw": 27.8,
+      "observedAt": "2026-09-10T18:48:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_06",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3364,
+      "lon": -121.5811,
+      "brightnessK": 329.5,
+      "confidence": "low",
+      "frpMw": 6.4,
+      "observedAt": "2026-09-10T18:48:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_07",
+      "schemaVersion": "1.0.0",
+      "lat": 44.2814,
+      "lon": -121.6695,
+      "brightnessK": 344.7,
+      "confidence": "nominal",
+      "frpMw": 15.9,
+      "observedAt": "2026-09-10T18:42:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    },
+    {
+      "eventId": "evt_aegisfire01_hotspot_08",
+      "schemaVersion": "1.0.0",
+      "lat": 44.3482,
+      "lon": -121.5724,
+      "brightnessK": 326.8,
+      "confidence": "low",
+      "frpMw": 4.2,
+      "observedAt": "2026-09-10T18:42:00.000Z",
+      "satellite": "NPP",
+      "source": "NASA_FIRMS_FIXTURE"
+    }
+  ],
+  "wind": [
+    {
+      "eventId": "evt_aegisfire01_wind_01",
+      "schemaVersion": "1.0.0",
+      "lat": 44.31,
+      "lon": -121.64,
+      "speedMps": 12.4,
+      "directionDeg": 242,
+      "gustMps": 18.1,
+      "observedAt": "2026-09-10T19:00:00.000Z",
+      "source": "MOCK_WIND"
+    },
+    {
+      "eventId": "evt_aegisfire01_wind_02",
+      "schemaVersion": "1.0.0",
+      "lat": 44.33,
+      "lon": -121.6,
+      "speedMps": 11.1,
+      "directionDeg": 248,
+      "gustMps": 16.4,
+      "observedAt": "2026-09-10T19:00:00.000Z",
+      "source": "MOCK_WIND"
+    },
+    {
+      "eventId": "evt_aegisfire01_wind_03",
+      "schemaVersion": "1.0.0",
+      "lat": 44.29,
+      "lon": -121.55,
+      "speedMps": 9.6,
+      "directionDeg": 236,
+      "gustMps": 14.2,
+      "observedAt": "2026-09-10T19:00:00.000Z",
+      "source": "MOCK_WIND"
+    },
+    {
+      "eventId": "evt_aegisfire01_wind_04",
+      "schemaVersion": "1.0.0",
+      "lat": 44.35,
+      "lon": -121.58,
+      "speedMps": 13.2,
+      "directionDeg": 251,
+      "gustMps": 19.0,
+      "observedAt": "2026-09-10T19:00:00.000Z",
+      "source": "MOCK_WIND"
+    },
+    {
+      "eventId": "evt_aegisfire01_wind_05",
+      "schemaVersion": "1.0.0",
+      "lat": 44.27,
+      "lon": -121.67,
+      "speedMps": 10.4,
+      "directionDeg": 239,
+      "gustMps": 15.5,
+      "observedAt": "2026-09-10T18:50:00.000Z",
+      "source": "MOCK_WIND"
+    },
+    {
+      "eventId": "evt_aegisfire01_wind_06",
+      "schemaVersion": "1.0.0",
+      "lat": 44.34,
+      "lon": -121.52,
+      "speedMps": 8.8,
+      "directionDeg": 244,
+      "gustMps": 12.9,
+      "observedAt": "2026-09-10T18:50:00.000Z",
+      "source": "MOCK_WIND"
+    }
+  ],
+  "agents": [
+    {
+      "eventId": "evt_aegisfire01_agent_propagation",
+      "schemaVersion": "1.0.0",
+      "agentId": "fire-propagation",
+      "incidentId": "AegisFire-01",
+      "title": "Fire propagation",
+      "summary": "Head fire aligned with WSW 12 m/s flow. 6-hour envelope reaches 2.8–3.4 km NE toward Sisters WUI; spotting possible across Whychus Creek if gusts hold above 17 m/s.",
+      "recommendations": [
+        {
+          "actionId": "prop-hold-north",
+          "label": "Anchor north flank at FS-16 / Black Butte south",
+          "detail": "Construct indirect line before 22:00Z while the 6h envelope is still west of the WUI.",
+          "priority": "P1",
+          "resourceHint": "Type 1 crews"
+        },
+        {
+          "actionId": "prop-retardant",
+          "label": "Retardant check-line north of Whychus Creek",
+          "detail": "Break spotting path toward Hwy 20. Window: next 90 minutes of daylight equivalent (demo clock).",
+          "priority": "P1",
+          "resourceHint": "Heavy tanker"
+        }
+      ],
+      "lineage": [
+        { "eventId": "evt_aegisfire01_hotspot_01", "kind": "hotspot", "label": "FIRMS VIIRS 44.3042N 121.6418W FRP 48 MW" },
+        { "eventId": "evt_aegisfire01_hotspot_03", "kind": "hotspot", "label": "FIRMS VIIRS northeast run" },
+        { "eventId": "evt_aegisfire01_wind_01", "kind": "wind", "label": "Mock wind 12.4 m/s from 242°" },
+        { "eventId": "evt_aegisfire01_sop_nwcg_spread", "kind": "sop", "label": "NWCG spread / spotting guidance (RAG pack stub)" }
+      ],
+      "model": { "primary": "openai", "backup": "deepseek", "used": "fixture", "runtime": "local" },
+      "producedAt": "2026-09-10T19:08:00.000Z"
+    },
+    {
+      "eventId": "evt_aegisfire01_agent_evacuation",
+      "schemaVersion": "1.0.0",
+      "agentId": "evacuation",
+      "incidentId": "AegisFire-01",
+      "title": "Evacuation logistics",
+      "summary": "Primary egress is Hwy 20 east to Redmond. Smoke will load the Sisters grid if the head reaches hotspot_06. Pre-stage contraflow decision at 3 km remaining.",
+      "recommendations": [
+        {
+          "actionId": "evac-hwy20",
+          "label": "Keep Hwy 20 EB as primary egress; hold WB reverse as trigger",
+          "detail": "Trigger: head within 3 km of Sisters city limit or visibility < 200 m on Cascade Ave.",
+          "priority": "P1",
+          "resourceHint": "Law / DOT"
+        },
+        {
+          "actionId": "evac-shelter",
+          "label": "Pre-open Redmond Fairgrounds shelter",
+          "detail": "Capacity planning for 1,200. Notify Deschutes County EM.",
+          "priority": "P2"
+        }
+      ],
+      "lineage": [
+        { "eventId": "evt_aegisfire01_hotspot_06", "kind": "hotspot", "label": "Low-confidence leading edge toward WUI" },
+        { "eventId": "evt_aegisfire01_wind_03", "kind": "wind", "label": "Sisters grid wind 9.6 m/s" },
+        { "eventId": "evt_aegisfire01_crowd_01", "kind": "crowd", "label": "PII-scrubbed Camp Polk smoke report" },
+        { "eventId": "evt_aegisfire01_sop_evac", "kind": "sop", "label": "County evac SOP (RAG pack stub)" }
+      ],
+      "model": { "primary": "openai", "backup": "deepseek", "used": "fixture", "runtime": "local" },
+      "producedAt": "2026-09-10T19:09:00.000Z"
+    },
+    {
+      "eventId": "evt_aegisfire01_agent_resources",
+      "schemaVersion": "1.0.0",
+      "agentId": "resource-allocation",
+      "incidentId": "AegisFire-01",
+      "title": "Resource allocation",
+      "summary": "Commit engines to DP-12 (Camp Polk), tanker on the Whychus check-line, and hold 1 Type 1 crew as IA for spot fires east of FS-16. Water tenders remain 40% unallocated.",
+      "recommendations": [
+        {
+          "actionId": "res-engines",
+          "label": "Stage 4 Type 3 engines at DP-12 Camp Polk",
+          "detail": "Fill from Sisters Station 701. Do not split to west drainage until north flank is anchored.",
+          "priority": "P1",
+          "resourceHint": "Engines"
+        },
+        {
+          "actionId": "res-tanker",
+          "label": "Request 1 heavy air tanker + lead plane",
+          "detail": "Drop north of Whychus aligned with propagation envelope.",
+          "priority": "P1",
+          "resourceHint": "Aviation"
+        },
+        {
+          "actionId": "res-crews",
+          "label": "2 Type 1 crews Black Butte south / 1 in IA reserve",
+          "detail": "Reserve crew covers spotting east of FS-16.",
+          "priority": "P2",
+          "resourceHint": "Hand crews"
+        }
+      ],
+      "lineage": [
+        { "eventId": "evt_aegisfire01_agent_propagation", "kind": "feed", "label": "Propagation envelope" },
+        { "eventId": "evt_aegisfire01_agent_evacuation", "kind": "feed", "label": "Hwy 20 egress plan" },
+        { "eventId": "evt_aegisfire01_wind_04", "kind": "wind", "label": "North-flank gusts 19 m/s" }
+      ],
+      "model": { "primary": "openai", "backup": "deepseek", "used": "fixture", "runtime": "local" },
+      "producedAt": "2026-09-10T19:10:00.000Z"
+    }
+  ],
+  "feedHealth": {
+    "eventId": "evt_aegisfire01_feed_health",
+    "schemaVersion": "1.0.0",
+    "overall": "ok",
+    "feeds": [
+      {
+        "id": "firms",
+        "label": "NASA FIRMS",
+        "status": "ok",
+        "detail": "Fixture VIIRS hotspots (no FIRMS_MAP_KEY)",
+        "lastSuccessAt": "2026-09-10T18:54:00.000Z"
+      },
+      {
+        "id": "wind",
+        "label": "Wind / IoT",
+        "status": "ok",
+        "detail": "Mock vector field — Stage 1",
+        "lastSuccessAt": "2026-09-10T19:00:00.000Z"
+      },
+      {
+        "id": "agents",
+        "label": "Agent runtime",
+        "status": "ok",
+        "detail": "Local Modal stub · LLM fixture (OpenAI/DeepSeek reserved)",
+        "lastSuccessAt": "2026-09-10T19:10:00.000Z"
+      },
+      {
+        "id": "crowd",
+        "label": "Crowdsource",
+        "status": "ok",
+        "detail": "1 report ingested · PII scrubbed",
+        "lastSuccessAt": "2026-09-10T18:58:00.000Z"
+      },
+      {
+        "id": "rf_sim",
+        "label": "RF / edge mesh",
+        "status": "ok",
+        "detail": "SIM only — no live RF",
+        "lastSuccessAt": "2026-09-10T19:00:00.000Z"
+      }
+    ],
+    "producedAt": "2026-09-10T19:12:00.000Z"
+  },
+  "timeline": [
+    {
+      "eventId": "evt_aegisfire01_tl_01",
+      "schemaVersion": "1.0.0",
+      "at": "2026-09-10T16:05:00.000Z",
+      "kind": "system",
+      "label": "Incident opened",
+      "detail": "AegisFire-01 · Cascade Range placeholder"
+    },
+    {
+      "eventId": "evt_aegisfire01_tl_02",
+      "schemaVersion": "1.0.0",
+      "at": "2026-09-10T18:42:00.000Z",
+      "kind": "ingest",
+      "label": "FIRMS pass loaded",
+      "detail": "8 VIIRS detections",
+      "sourceEventId": "evt_aegisfire01_hotspot_07"
+    },
+    {
+      "eventId": "evt_aegisfire01_tl_03",
+      "schemaVersion": "1.0.0",
+      "at": "2026-09-10T18:58:00.000Z",
+      "kind": "crowd",
+      "label": "Camp Polk smoke report (PII scrubbed)",
+      "detail": "Heavy smoke on Camp Polk. Original contact fields redacted.",
+      "sourceEventId": "evt_aegisfire01_crowd_01"
+    },
+    {
+      "eventId": "evt_aegisfire01_tl_04",
+      "schemaVersion": "1.0.0",
+      "at": "2026-09-10T19:00:00.000Z",
+      "kind": "sim",
+      "label": "RF mesh heartbeat",
+      "detail": "SIM — edge node E-14 synthetic. Not live RF."
+    },
+    {
+      "eventId": "evt_aegisfire01_tl_05",
+      "schemaVersion": "1.0.0",
+      "at": "2026-09-10T19:10:00.000Z",
+      "kind": "agent",
+      "label": "Three-agent cycle complete",
+      "detail": "Propagation · Evacuation · Resources",
+      "sourceEventId": "evt_aegisfire01_agent_resources"
+    }
+  ],
+  "resources": [
+    { "id": "engines", "label": "Type 3 engines", "allocated": 4, "available": 7, "unit": "units" },
+    { "id": "crews", "label": "Type 1 crews", "allocated": 2, "available": 4, "unit": "crews" },
+    { "id": "aviation", "label": "Heavy tanker slots", "allocated": 1, "available": 2, "unit": "slots" },
+    { "id": "tenders", "label": "Water tenders", "allocated": 2, "available": 5, "unit": "units" },
+    { "id": "dozers", "label": "Dozers", "allocated": 1, "available": 3, "unit": "units" }
+  ]
+}

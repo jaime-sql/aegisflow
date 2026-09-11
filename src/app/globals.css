@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --ops-bg: #07090d;
+  --ops-panel: #0e1218;
+  --ops-panel-2: #121821;
+  --ops-border: #1c2533;
+  --ops-text: #e8eef6;
+  --ops-muted: #8b98a8;
+  --ops-fire: #ff6b2c;
+  --ops-fire-2: #ffb020;
+  --ops-cyan: #5ce1e6;
+  --ops-ok: #3dd68c;
+  --ops-warn: #f5c542;
+  --ops-down: #ff5d73;
+  --background: var(--ops-bg);
+  --foreground: var(--ops-text);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ops-bg: var(--ops-bg);
+  --color-ops-panel: var(--ops-panel);
+  --color-ops-border: var(--ops-border);
+  --color-ops-muted: var(--ops-muted);
+  --color-ops-fire: var(--ops-fire);
+  --color-ops-cyan: var(--ops-cyan);
+  --color-ops-ok: var(--ops-ok);
+  --color-ops-warn: var(--ops-warn);
+  --color-ops-down: var(--ops-down);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.ops-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.ops-scroll::-webkit-scrollbar-thumb {
+  background: #2a3545;
+  border-radius: 99px;
+}
+
+.maplibregl-popup-content {
+  background: #0e1218 !important;
+  color: #e8eef6 !important;
+  border: 1px solid #1c2533;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-size: 12px;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #0e1218 !important;
+}
+.maplibregl-ctrl-attrib {
+  background: rgba(7, 9, 13, 0.7) !important;
+  color: #8b98a8 !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: #5ce1e6 !important;
+}
