@@ -27,7 +27,7 @@ Hotspots, wind ticks, agent outputs, feed-health snapshots, and timeline items e
 - **IncidentEvent** — fused snapshot the Ops shell loads.
 - **Hotspot** — NASA FIRMS (live or fixture) thermal detection.
 - **WindTick** — mock / IoT wind vector at a point.
-- **AgentOutput** — one of `fire-propagation` · `evacuation` · `resource-allocation`, with `lineage[]` and model router metadata (`openai` primary, `deepseek` backup, `fixture` in Stage 1).
+- **AgentOutput** — one of `fire-propagation` · `evacuation` · `resource-allocation`, with `confidence`, `outputHash`, `lineage[]` and model router metadata (`openai` primary, `deepseek` backup, `fixture` in Stage 1).
 - **FeedHealth** — per-adapter `ok` / `degraded` / `down` so one failed ingest does not blank the board.
 
 ## Fabric twin

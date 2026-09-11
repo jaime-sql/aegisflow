@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --ops-bg: #07090d;
-  --ops-panel: #0e1218;
-  --ops-panel-2: #121821;
-  --ops-border: #1c2533;
-  --ops-text: #e8eef6;
-  --ops-muted: #8b98a8;
-  --ops-fire: #ff6b2c;
+  --ops-bg: #0b1220;
+  --ops-panel: #121a2b;
+  --ops-panel-2: #162033;
+  --ops-border: #1e2a40;
+  --ops-text: #e8eef9;
+  --ops-muted: #8b9bb8;
+  --ops-fire: #ff4d2e;
   --ops-fire-2: #ffb020;
-  --ops-cyan: #5ce1e6;
-  --ops-ok: #3dd68c;
-  --ops-warn: #f5c542;
-  --ops-down: #ff5d73;
+  --ops-cyan: #3db9ff;
+  --ops-ok: #3ddc97;
+  --ops-warn: #ffb020;
+  --ops-down: #ff5c5c;
+  --ops-corridor: #3ddc97;
   --background: var(--ops-bg);
   --foreground: var(--ops-text);
 }
@@ -48,25 +49,30 @@ body {
   width: 8px;
 }
 .ops-scroll::-webkit-scrollbar-thumb {
-  background: #2a3545;
+  background: #243044;
   border-radius: 99px;
 }
 
 .leaflet-container {
   height: 100%;
   width: 100%;
-  background: #07090d;
+  background: #0b1220;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 .leaflet-popup-content-wrapper {
   border-radius: 8px;
+  background: #121a2b;
+  color: #e8eef9;
+}
+.leaflet-popup-tip {
+  background: #121a2b;
 }
 .leaflet-control-attribution {
-  background: rgba(7, 9, 13, 0.7) !important;
-  color: #8b98a8 !important;
+  background: rgba(11, 18, 32, 0.75) !important;
+  color: #8b9bb8 !important;
 }
 .leaflet-control-attribution a {
-  color: #5ce1e6 !important;
+  color: #3db9ff !important;
 }
 .ops-dark-tiles {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05) saturate(0.35);

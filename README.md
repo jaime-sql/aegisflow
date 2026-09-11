@@ -27,6 +27,8 @@ Demo region is a **Cascade Range / Sisters / Hwy 20 placeholder** until Jaime pi
 
 - [Project hub](https://app.notion.com/p/3d5825c9c7b7816aa059d4795175d7fb)
 - [Architecture](https://app.notion.com/p/3d5825c9c7b78104a395c1b4bb1fb960)
+- [Design — Ops UI & judge surfaces](https://app.notion.com/p/3d8825c9c7b7810fa159e2b8094a0cdf)
+- [QA — Test bar & judge demo script](https://app.notion.com/p/3d8825c9c7b78155bec5fa727274a80e)
 - [First steps & build plan](https://app.notion.com/p/3d5825c9c7b7813d90a7fa489e2e2352)
 - [Credits & capability map](https://app.notion.com/p/3d5825c9c7b78129b95ce8133bf0c897)
 
@@ -38,7 +40,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Empty Clerk keys enable the DEV bypass so the dashboard still loads.
+Open [http://localhost:3000/ops](http://localhost:3000/ops). Empty Clerk keys enable the DEV bypass so the dashboard still loads. Sign-in is `/sign-in` (after auth, Clerk redirects to `/ops`).
 
 ```bash
 npm run build
@@ -50,9 +52,10 @@ Without API keys, Ops loads the **AegisFire-01** fixture (map, exec summary, lin
 
 | Check | URL |
 | --- | --- |
-| Ops dashboard | http://localhost:3000 |
-| Viewer (bypass) | http://localhost:3000/?role=viewer |
-| Fabric stub (same IDs, no map) | http://localhost:3000/fabric |
+| Ops dashboard | http://localhost:3000/ops |
+| Viewer (bypass) | http://localhost:3000/ops?role=viewer |
+| Clerk sign-in | http://localhost:3000/sign-in |
+| Fabric twin (same IDs, no map) | http://localhost:3000/fabric |
 | Incident JSON | http://localhost:3000/api/ops/incident |
 
 ## Clerk roles
@@ -70,7 +73,7 @@ or `{ "role": "viewer" }`. Any other or missing value is treated as **viewer**.
 
 ### DEV bypass (non-prod)
 
-If Clerk keys are missing, middleware does not protect routes and a **DEV BYPASS · NON-PROD** banner is shown. Default bypass role is `manager`. Override with `AEGISFLOW_DEV_ROLE=viewer` or `/?role=viewer`. Use this for local QA only — not for a judged production deploy.
+If Clerk keys are missing, middleware does not protect routes and a **DEV BYPASS · NON-PROD** banner is shown. Default bypass role is `manager`. Override with `AEGISFLOW_DEV_ROLE=viewer` or `/ops?role=viewer`. Use this for local QA only — not for a judged production deploy.
 
 ## Environment
 
@@ -87,8 +90,8 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 ## Repo layout
 
 ```
-src/app/                 Ops App Router pages + /fabric stub + /api/ops/incident
-src/components/ops/      Top bar, Leaflet map, right rail
+src/app/                 /ops dashboard + /fabric twin + /sign-in + /api/ops/incident
+src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lineage drawer
 src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/ingest/          firms.ts · wind.ts
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime

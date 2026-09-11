@@ -4,7 +4,7 @@ import { runAllAgents } from "@/lib/agents";
 import { cloneFixtureIncident } from "@/lib/fixtures/aegisfire-01";
 import type { FeedHealth, IncidentEvent } from "@/lib/schema";
 import { SCHEMA_VERSION } from "@/lib/schema";
-import { SAMPLE_CROWD_REPORT, scrubPii } from "@/lib/pii";
+import { SAMPLE_CROWD_REPORT, PUBLIC_CROWD_COPY, scrubPii } from "@/lib/pii";
 
 function rollup(
   incident: IncidentEvent,
@@ -58,7 +58,7 @@ export async function loadOpsIncident(): Promise<IncidentEvent> {
       firms.health,
       wind.health,
       agents.health,
-      { ...crowdHealth, detail: `${crowd.redactions} PII field(s) scrubbed · ${crowd.scrubbed}` },
+      { ...crowdHealth, detail: `${PUBLIC_CROWD_COPY} · ${crowd.redactions} fields redacted` },
       rfHealth,
     ]),
     updatedAt: new Date().toISOString(),

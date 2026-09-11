@@ -39,3 +39,6 @@ export function scrubPii(text: string): ScrubResult {
 
 export const SAMPLE_CROWD_REPORT =
   "This is Maria Lopez at 214 Elm Street, email maria.lopez@example.com or call 541-555-0199 — heavy smoke on Camp Polk.";
+
+/** Public Ops copy — original PII never shown in panels. */
+export const PUBLIC_CROWD_COPY = "[Scrubbed] Smoke near Hwy ██, Sector C";

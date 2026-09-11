@@ -4,11 +4,13 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
+import { PUBLIC_CROWD_COPY } from "@/lib/pii";
+import { SimBadge } from "./SimBadge";
 
 function hotspotColor(confidence: Hotspot["confidence"]) {
-  if (confidence === "high") return "#ff6b2c";
-  if (confidence === "nominal") return "#ffb020";
-  return "#f5c542";
+  if (confidence === "high") return "#FF4D2E";
+  if (confidence === "nominal") return "#FFB020";
+  return "#FFB020";
 }
 
 function windDest(w: WindTick): [number, number] {
@@ -38,6 +40,23 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       maxZoom: 19,
     }).addTo(map);
 
+    L.polyline(
+      [
+        [44.304, -121.642],
+        [44.312, -121.58],
+        [44.291, -121.549],
+        [44.272, -121.48],
+      ],
+      {
+        color: "#3DDC97",
+        weight: 3,
+        opacity: 0.85,
+        dashArray: "8 6",
+      },
+    )
+      .bindPopup("Safe corridor · Hwy 20 EB (planned)")
+      .addTo(map);
+
     for (const h of incident.hotspots) {
       L.circleMarker([h.lat, h.lon], {
         radius: 5 + Math.min(h.brightnessK / 80, 8),
@@ -47,8 +66,8 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
         fillOpacity: 0.9,
       })
         .bindPopup(
-          `<div style="font-family:ui-monospace,monospace;color:#111">
-            <div style="color:#c2410c">${h.eventId}</div>
+          `<div style="font-family:ui-monospace,monospace">
+            <div style="color:#FF4D2E">${h.eventId}</div>
             <div>${h.confidence} · ${h.brightnessK.toFixed(0)} K</div>
           </div>`,
         )
@@ -58,14 +77,14 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
     for (const w of incident.wind) {
       const dest = windDest(w);
       L.polyline([[w.lat, w.lon], dest], {
-        color: "#5ce1e6",
+        color: "#3DB9FF",
         weight: 2,
         opacity: 0.9,
       }).addTo(map);
       L.circleMarker(dest, {
         radius: 3,
-        color: "#5ce1e6",
-        fillColor: "#5ce1e6",
+        color: "#3DB9FF",
+        fillColor: "#3DB9FF",
         fillOpacity: 1,
         weight: 0,
       })
@@ -79,13 +98,29 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       [incident.region.center.lat + 0.04, incident.region.center.lon - 0.06],
       {
         radius: 6,
-        color: "#5ce1e6",
+        color: "#3DB9FF",
         weight: 2,
-        fillColor: "#8b98a8",
+        fillColor: "#8B9BB8",
         fillOpacity: 0.9,
       },
     )
-      .bindPopup("RF MESH · SIM<br/>evt_aegisfire01_tl_04")
+      .bindPopup("RF / edge mesh · SIM<br/>evt_aegisfire01_tl_04")
+      .addTo(map);
+
+    L.circleMarker([44.301, -121.525], {
+      radius: 6,
+      color: "#FFB020",
+      weight: 2,
+      fillColor: "#121A2B",
+      fillOpacity: 0.95,
+    })
+      .bindPopup(
+        `<div style="font-family:ui-monospace,monospace">
+          <div><strong>Citizen report</strong> · evt_aegisfire01_crowd_01</div>
+          <div>${PUBLIC_CROWD_COPY}</div>
+          <div style="opacity:.7">original PII never shown in Ops panels</div>
+        </div>`,
+      )
       .addTo(map);
 
     mapRef.current = map;
@@ -101,23 +136,28 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
   return (
     <div className="relative h-full min-h-[320px] w-full">
       <div ref={ref} className="absolute inset-0 z-0" />
-      <div className="pointer-events-none absolute bottom-8 left-3 z-[500] rounded-md border border-[#1c2533] bg-[#0e1218]/90 px-3 py-2 text-[11px] backdrop-blur">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-[#8b98a8]">
-          Legend
+      <div className="pointer-events-none absolute bottom-8 left-3 z-[500] space-y-2">
+        <div className="rounded-md border border-[#1E2A40] bg-[#121A2B]/90 px-3 py-2 text-[11px] backdrop-blur">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
+            Legend
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#FF4D2E]" /> Hotspot
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-4 bg-[#3DB9FF]" /> Wind
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-4 bg-[#3DDC97]" /> Corridor
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b2c]" /> FIRMS hotspot
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-0.5 w-4 bg-[#5ce1e6]" /> Wind vector (mock)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full border-2 border-[#5ce1e6] bg-[#8b98a8]" />{" "}
-          RF mesh · SIM
+        <div className="flex gap-1">
+          <SimBadge label="RF" />
+          <SimBadge label="Edge" />
         </div>
       </div>
       {incident.region.placeholder && (
-        <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-[#f5c542]/40 bg-[#0e1218]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#f5c542]">
+        <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-[#FFB020]/40 bg-[#121A2B]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#FFB020]">
           Demo region placeholder
         </div>
       )}

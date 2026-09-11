@@ -75,6 +75,8 @@ export const AgentOutputSchema = z.object({
   agentId: AgentIdSchema,
   incidentId: z.string(),
   title: z.string(),
+  confidence: z.number().min(0).max(1),
+  outputHash: z.string().min(4),
   summary: z.string(),
   recommendations: z.array(DispatchActionSchema),
   lineage: z.array(LineageSourceSchema).min(1),

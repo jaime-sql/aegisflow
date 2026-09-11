@@ -12,7 +12,7 @@
   },
   "startedAt": "2026-09-10T16:05:00.000Z",
   "updatedAt": "2026-09-10T19:12:00.000Z",
-  "executiveSummary": "AegisFire-01 is a wind-driven timber/WUI fire west of Sisters, Oregon (Cascade Range placeholder). VIIRS hotspots and mock WSW winds (9–14 m/s) indicate 6-hour spread toward the Hwy 20 corridor. Three agents recommend holding DP-12, pre-staging eastbound evac on Hwy 20, and committing Type 3 engines plus a heavy tanker. Viewer role sees the same dispatch list locked. RF mesh row is SIM only.",
+  "executiveSummary": "Wind-driven timber/WUI fire west of Sisters (Cascade Range mock). VIIRS cluster aligned with WSW 12 m/s; 6-hour envelope toward the Hwy 20 corridor. Hold DP-12, keep Hwy 20 eastbound as egress, commit engines + tanker.",
   "hotspots": [
     {
       "eventId": "evt_aegisfire01_hotspot_01",
@@ -185,7 +185,9 @@
       "schemaVersion": "1.0.0",
       "agentId": "fire-propagation",
       "incidentId": "AegisFire-01",
-      "title": "Fire propagation",
+      "title": "Propagation",
+      "confidence": 0.82,
+      "outputHash": "out_af01_prop_7c2a",
       "summary": "Head fire aligned with WSW 12 m/s flow. 6-hour envelope reaches 2.8–3.4 km NE toward Sisters WUI; spotting possible across Whychus Creek if gusts hold above 17 m/s.",
       "recommendations": [
         {
@@ -217,7 +219,9 @@
       "schemaVersion": "1.0.0",
       "agentId": "evacuation",
       "incidentId": "AegisFire-01",
-      "title": "Evacuation logistics",
+      "title": "Evacuation",
+      "confidence": 0.76,
+      "outputHash": "out_af01_evac_91b4",
       "summary": "Primary egress is Hwy 20 east to Redmond. Smoke will load the Sisters grid if the head reaches hotspot_06. Pre-stage contraflow decision at 3 km remaining.",
       "recommendations": [
         {
@@ -248,7 +252,9 @@
       "schemaVersion": "1.0.0",
       "agentId": "resource-allocation",
       "incidentId": "AegisFire-01",
-      "title": "Resource allocation",
+      "title": "Resources",
+      "confidence": 0.71,
+      "outputHash": "out_af01_res_c30e",
       "summary": "Commit engines to DP-12 (Camp Polk), tanker on the Whychus check-line, and hold 1 Type 1 crew as IA for spot fires east of FS-16. Water tenders remain 40% unallocated.",
       "recommendations": [
         {
@@ -348,8 +354,8 @@
       "schemaVersion": "1.0.0",
       "at": "2026-09-10T18:58:00.000Z",
       "kind": "crowd",
-      "label": "Camp Polk smoke report (PII scrubbed)",
-      "detail": "Heavy smoke on Camp Polk. Original contact fields redacted.",
+      "label": "Citizen report",
+      "detail": "[Scrubbed] Smoke near Hwy ██, Sector C",
       "sourceEventId": "evt_aegisfire01_crowd_01"
     },
     {
@@ -371,10 +377,8 @@
     }
   ],
   "resources": [
-    { "id": "engines", "label": "Type 3 engines", "allocated": 4, "available": 7, "unit": "units" },
-    { "id": "crews", "label": "Type 1 crews", "allocated": 2, "available": 4, "unit": "crews" },
-    { "id": "aviation", "label": "Heavy tanker slots", "allocated": 1, "available": 2, "unit": "slots" },
-    { "id": "tenders", "label": "Water tenders", "allocated": 2, "available": 5, "unit": "units" },
-    { "id": "dozers", "label": "Dozers", "allocated": 1, "available": 3, "unit": "units" }
+    { "id": "crews", "label": "Crews", "allocated": 2, "available": 4, "unit": "crews" },
+    { "id": "aircraft", "label": "Aircraft", "allocated": 1, "available": 2, "unit": "slots" },
+    { "id": "retardant", "label": "Retardant", "allocated": 6, "available": 10, "unit": "kl" }
   ]
 }

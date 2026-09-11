@@ -1,8 +1,4 @@
-import { OpsShell } from "@/components/ops/OpsShell";
-import { getOpsSession } from "@/lib/auth/session";
-import { loadOpsIncident } from "@/lib/incident/load";
-
-export const dynamic = "force-dynamic";
+import { redirect } from "next/navigation";
 
 export default async function Home({
   searchParams,
@@ -10,10 +6,6 @@ export default async function Home({
   searchParams: Promise<{ role?: string }>;
 }) {
   const params = await searchParams;
-  const [incident, session] = await Promise.all([
-    loadOpsIncident(),
-    getOpsSession(params.role),
-  ]);
-
-  return <OpsShell incident={incident} session={session} />;
+  const q = params.role ? `?role=${encodeURIComponent(params.role)}` : "";
+  redirect(`/ops${q}`);
 }
