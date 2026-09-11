@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx src/lib/schema/check.ts && tsx tests/base-path.check.ts && tsx tests/aegisflow-path.check.ts",
+    "test": "tsx src/lib/schema/check.ts && tsx tests/base-path.check.ts && tsx tests/aegisflow-path.check.ts && tsx tests/middleware-routes.check.ts && tsx tests/clerk-prod.check.ts",
     "cf:build": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "worker:local": "python3 workers/modal_stub.py"

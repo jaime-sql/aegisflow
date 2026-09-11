@@ -63,31 +63,37 @@ const worker = {
 
     // Prefer the OpenNext service binding so Clerk sees cortexmatter.com/aegisflow
     // (Host + path) instead of a pages.dev/workers.dev preview host.
-    if (env.AEGISFLOW) {
-      const bound = await env.AEGISFLOW.fetch(new Request(dest.toString(), init));
-      return new Response(bound.body, {
-        status: bound.status,
-        statusText: bound.statusText,
-        headers: bound.headers,
-      });
-    }
-
-    dest.host = new URL(env.PAGES_ORIGIN).host;
-    dest.protocol = "https:";
-
-    const upstream = await fetch(dest, init);
-    const headers = new Headers(upstream.headers);
-    const location = headers.get("Location");
-    if (location) {
-      headers.set("Location", rewriteLocation(location, url, env.PAGES_ORIGIN, basePath));
-    }
+    const upstream = env.AEGISFLOW
+      ? await env.AEGISFLOW.fetch(new Request(dest.toString(), init))
+      : await fetch(withPagesOrigin(dest, env.PAGES_ORIGIN), init);
 
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
-      headers,
+      headers: publicResponseHeaders(upstream.headers, url, env.PAGES_ORIGIN, basePath),
     });
   },
 };
+
+function withPagesOrigin(dest: URL, pagesOrigin: string): URL {
+  const out = new URL(dest.href);
+  out.host = new URL(pagesOrigin).host;
+  out.protocol = "https:";
+  return out;
+}
+
+function publicResponseHeaders(
+  incoming: Headers,
+  requestUrl: URL,
+  pagesOrigin: string,
+  basePath: string,
+): Headers {
+  const headers = new Headers(incoming);
+  const location = headers.get("Location");
+  if (location) {
+    headers.set("Location", rewriteLocation(location, requestUrl, pagesOrigin, basePath));
+  }
+  return headers;
+}
 
 export default worker;

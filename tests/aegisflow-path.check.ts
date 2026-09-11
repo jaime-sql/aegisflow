@@ -49,5 +49,13 @@ assert.doesNotMatch(wrangler, /"pattern": "cortexmatter.com"/);
 
 const appWrangler = readFileSync("wrangler.jsonc", "utf8");
 assert.doesNotMatch(appWrangler, /cortexmatter.com/);
+assert.match(appWrangler, /"BASE_PATH": "\/aegisflow"/);
+
+const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
+assert.match(pathWorker, /publicResponseHeaders/);
+assert.match(
+  pathWorker,
+  /env\.AEGISFLOW[\s\S]*publicResponseHeaders|publicResponseHeaders[\s\S]*env\.AEGISFLOW/,
+);
 
 console.log("OK  aegisflow-path Worker only covers /aegisflow");

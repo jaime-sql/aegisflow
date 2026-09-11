@@ -84,11 +84,11 @@ In [Clerk Dashboard](https://dashboard.clerk.com) → the AegisFlow application 
 | Sign-up | `https://cortexmatter.com/aegisflow/sign-up` |
 | After sign-in | `https://cortexmatter.com/aegisflow/ops` |
 | After sign-up | `https://cortexmatter.com/aegisflow/ops` |
-| Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.pages.dev` |
+| Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.jaime-8a8.workers.dev`, `https://aegisflow.pages.dev` |
 
 Do **not** point Clerk at `https://cortexmatter.com/` (apex). That URL is reserved for other apps.
 
-The Cloudflare prod workflow inlines `NEXT_PUBLIC_CLERK_*` paths with the `/aegisflow` prefix from `next.config.ts`. Local `.env.local` keeps the unprefixed `/sign-in` values.
+The Cloudflare prod workflow inlines `NEXT_PUBLIC_CLERK_*` paths with the `/aegisflow` prefix from `next.config.ts`. The OpenNext Worker also receives those paths as Wrangler `vars`, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` as Worker **secrets**, so middleware can redirect to `/aegisflow/sign-in` at runtime. Local `.env.local` keeps the unprefixed `/sign-in` values.
 
 ### DEV bypass (non-prod)
 
@@ -142,16 +142,35 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
    - Optional: `FIRMS_MAP_KEY` (otherwise Ops uses the fixture). Set it as a Wrangler secret on Worker `aegisflow` if you want live FIRMS in prod.
-3. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow`, then deploys `workers/aegisflow-path`.
+3. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads `CLERK_SECRET_KEY` **and** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as Worker secrets; path vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
 4. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
-   - `https://cortexmatter.com/aegisflow` → Ops (or Clerk sign-in, then `/aegisflow/ops`).
-   - Sign-in / sign-up stay under `/aegisflow/...`.
+   - `https://cortexmatter.com/aegisflow` → Clerk sign-in (`/aegisflow/sign-in`) or `/aegisflow/ops` after auth. Must **not** be HTTP 500.
+   - Signed-out `/aegisflow/ops` → **redirect to sign-in** (not a Clerk 404 `protect-rewrite`).
+   - Sign-in / sign-up stay under `/aegisflow/...` and return 200 with the Clerk widget (Dev keys show Clerk’s development banner).
    - Map tiles + `/aegisflow/_next/...` + `/aegisflow/leaflet/...` load.
    - Viewer vs Manager still works (Clerk `publicMetadata.role`).
    - Fabric twin: `https://cortexmatter.com/aegisflow/fabric`.
+   - Direct Worker: `https://aegisflow.jaime-8a8.workers.dev/aegisflow` should behave the same (add this host under Clerk allowed origins).
 
 Do not connect Cloudflare Git auto-deploy to `main` if you want promotion to stay manual (`workflow_dispatch` / `prod-*` tags), matching Rosario.
+
+### Re-run Cloudflare Prod after the 500 fix
+
+`24c2c7b` deployed a green Worker that still failed in the browser:
+
+1. **`/aegisflow/sign-in` HTTP 500** — `ClerkGate` mounted `ClerkProvider` only after `useEffect`, so `<SignIn>` SSR’d on OpenNext without Clerk context.
+2. **Signed-out `/ops` → 404** — `auth.protect()` did a Clerk `protect-rewrite` (`x-clerk-auth-reason: protect-rewrite, dev-browser-missing`) because middleware had no runtime `signInUrl` / `BASE_PATH`. The home page then 307’d into that 404.
+
+This is **not** a missing R2 cache binding and **not** the path Worker stripping `/aegisflow`. Dev Clerk keys (`pk_test_` / `sk_test_`) are OK for first smoke if the hosts above are allowed; use `pk_live_` / `sk_live_` for the judged demo.
+
+**Jaime re-run**
+
+1. Merge the fix PR to `main`.
+2. Confirm Actions secrets: `CLOUDFLARE_API_TOKEN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`.
+3. Clerk Dashboard → add `https://cortexmatter.com` **and** `https://aegisflow.jaime-8a8.workers.dev` as allowed origins (paths in the table above).
+4. **Actions → Cloudflare Prod → Run workflow** (or push a new `prod-*` tag). Do not use Cloudflare Git auto-deploy.
+5. Smoke `https://cortexmatter.com/aegisflow`, `/aegisflow/sign-in`, and `/aegisflow/ops` in a real browser (Clerk Dev handshake sets a cookie; `curl` will still look signed-out).
 
 ## IEEE originality
 
