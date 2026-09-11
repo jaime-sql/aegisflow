@@ -1,9 +1,14 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
+
+const ClerkUserButton = dynamic(
+  () => import("./ClerkUserButton").then((m) => m.ClerkUserButton),
+  { ssr: false },
+);
 
 function statusColor(status: string) {
   if (status === "ok") return "bg-[#3dd68c]";
@@ -70,7 +75,7 @@ export function TopBar({
         </span>
 
         {session.clerkEnabled ? (
-          <UserButton />
+          <ClerkUserButton />
         ) : (
           <div
             title={session.displayName}

@@ -52,21 +52,22 @@ body {
   border-radius: 99px;
 }
 
-.maplibregl-popup-content {
-  background: #0e1218 !important;
-  color: #e8eef6 !important;
-  border: 1px solid #1c2533;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  font-size: 12px;
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #07090d;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
-  border-top-color: #0e1218 !important;
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
 }
-.maplibregl-ctrl-attrib {
+.leaflet-control-attribution {
   background: rgba(7, 9, 13, 0.7) !important;
   color: #8b98a8 !important;
 }
-.maplibregl-ctrl-attrib a {
+.leaflet-control-attribution a {
   color: #5ce1e6 !important;
+}
+.ops-dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05) saturate(0.35);
 }

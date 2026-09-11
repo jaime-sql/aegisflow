@@ -1,26 +1,25 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
-import { isClerkConfigured } from "@/lib/auth/config";
 
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-]);
+function clerkConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
+  );
+}
 
-const clerk = isClerkConfigured()
-  ? clerkMiddleware(async (auth, req) => {
-      if (!isPublicRoute(req)) {
-        await auth.protect();
-      }
-    })
-  : null;
-
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
-  if (!clerk) {
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (!clerkConfigured()) {
     return NextResponse.next();
   }
-  return clerk(req, event);
+
+  const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
+  const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+  const handler = clerkMiddleware(async (auth, request) => {
+    if (!isPublicRoute(request)) {
+      await auth.protect();
+    }
+  });
+  return handler(req, event);
 }
 
 export const config = {

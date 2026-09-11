@@ -88,7 +88,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 
 ```
 src/app/                 Ops App Router pages + /fabric stub + /api/ops/incident
-src/components/ops/      Top bar, MapLibre map, right rail
+src/components/ops/      Top bar, Leaflet map, right rail
 src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/ingest/          firms.ts · wind.ts
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
