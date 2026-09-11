@@ -5,14 +5,17 @@
   "description": "AegisFlow Stage 1 — IEEE Response Quest #5395 wildfire Ops scaffold",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx src/lib/schema/check.ts",
+    "test": "tsx src/lib/schema/check.ts && tsx tests/base-path.check.ts && tsx tests/aegisflow-path.check.ts",
+    "cf:build": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "worker:local": "python3 workers/modal_stub.py"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.33.1",
+    "@opennextjs/cloudflare": "^1.20.6",
     "leaflet": "^1.9.4",
     "next": "15.5.25",
     "react": "^19.1.4",
@@ -30,6 +33,7 @@
     "eslint-config-next": "15.5.25",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.131.1"
   }
 }

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
 import { isFeedUnhealthy } from "@/lib/ui/status";
+import { withBasePath } from "@/lib/base-path";
 import { TopBar } from "./TopBar";
 import { RightRail } from "./RightRail";
 import { LineageDrawer } from "./LineageDrawer";
@@ -39,7 +40,7 @@ export function OpsShell({
           <span>DEV BYPASS · NON-PROD</span>
           <span className="font-normal">
             Clerk keys missing — role={session.role}. Viewer smoke:{" "}
-            <code className="font-mono">/ops?role=viewer</code>
+            <code className="font-mono">{withBasePath("/ops")}?role=viewer</code>
           </span>
         </div>
       )}
