@@ -9,7 +9,6 @@
     "head_sampling_rate": 1
   },
   "vars": {
-    "PAGES_ORIGIN": "https://aegisflow.pages.dev",
     "BASE_PATH": "/aegisflow",
     "PUBLIC_ORIGIN": "https://cortexmatter.com"
   },
