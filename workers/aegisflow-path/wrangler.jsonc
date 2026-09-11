@@ -1,0 +1,32 @@
+{
+  "name": "aegisflow-path",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-11",
+  "account_id": "8a8c9483df8e8a2a9adec437a0994fe4",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "PAGES_ORIGIN": "https://aegisflow.pages.dev",
+    "BASE_PATH": "/aegisflow",
+    "PUBLIC_ORIGIN": "https://cortexmatter.com"
+  },
+  "services": [
+    {
+      "binding": "AEGISFLOW",
+      "service": "aegisflow"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "cortexmatter.com/aegisflow",
+      "zone_name": "cortexmatter.com"
+    },
+    {
+      "pattern": "cortexmatter.com/aegisflow/*",
+      "zone_name": "cortexmatter.com"
+    }
+  ]
+}

@@ -5,7 +5,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
 import { PUBLIC_CROWD_COPY } from "@/lib/pii";
+import { withBasePath } from "@/lib/base-path";
 import { SimBadge } from "./SimBadge";
+
+const leafletIconPath = withBasePath("/leaflet");
 
 function hotspotColor(confidence: Hotspot["confidence"]) {
   if (confidence === "high") return "#FF4D2E";
@@ -27,6 +30,12 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
 
   useEffect(() => {
     if (!ref.current || mapRef.current) return;
+
+    L.Icon.Default.mergeOptions({
+      iconUrl: `${leafletIconPath}/marker-icon.png`,
+      iconRetinaUrl: `${leafletIconPath}/marker-icon-2x.png`,
+      shadowUrl: `${leafletIconPath}/marker-shadow.png`,
+    });
 
     const map = L.map(ref.current, {
       zoomControl: true,
