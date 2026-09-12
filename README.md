@@ -169,7 +169,8 @@ After PR #3, `https://aegisflow.jaime-8a8.workers.dev/aegisflow/sign-in` returne
 | `https://aegisflow.jaime-8a8.workers.dev/aegisflow` | **307** → `/aegisflow/sign-in` |
 | `https://aegisflow-path.jaime-8a8.workers.dev/aegisflow` | **307** (middleware only) |
 | `https://aegisflow-path.jaime-8a8.workers.dev/aegisflow/sign-in` | **503 Error 1019** (Worker self-recursion) |
-| `https://cortexmatter.com/aegisflow` | **NXDOMAIN** until the dummy A record exists; then same 1019 loop as the path Worker |
+| `https://cortexmatter.com/aegisflow` | **307** → `/aegisflow/sign-in` (after dummy A record) |
+| `https://cortexmatter.com/aegisflow/sign-in` | **503 Error 1019** (same loop as the path Worker hostname) |
 
 Root cause: `aegisflow-path` forwarded `new Request(https://<inbound-host>/aegisflow/...)`. OpenNext SSR with `global_fetch_strictly_public` fetches that URL; the host routes back into `aegisflow-path` → service bind → loop until Cloudflare Error 1019. Middleware redirects do not SSR, so `/` and `/ops` could 307 while `/sign-in` died.
 
