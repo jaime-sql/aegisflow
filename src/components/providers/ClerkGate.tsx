@@ -28,6 +28,7 @@ export function ClerkGate({
       signUpUrl={urls.signUpUrl}
       signInFallbackRedirectUrl={urls.afterSignInUrl}
       signUpFallbackRedirectUrl={urls.afterSignUpUrl}
+      afterSignOutUrl={urls.afterSignOutUrl}
     >
       {children}
     </ClerkProvider>

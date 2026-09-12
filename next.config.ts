@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: clerkUrls.signUpUrl,
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: clerkUrls.afterSignInUrl,
     NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: clerkUrls.afterSignUpUrl,
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL: clerkUrls.afterSignOutUrl,
     NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: clerkUrls.afterSignInUrl,
     NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: clerkUrls.afterSignUpUrl,
   },
