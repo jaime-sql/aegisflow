@@ -23,8 +23,11 @@
     }
   ],
   "routes": [
+    // Prefix, not exact `/aegisflow`: Clerk returns to
+    // `/aegisflow?__clerk_handshake=…`, which missed the exact
+    // route and fell through to the dummy A record (522).
     {
-      "pattern": "cortexmatter.com/aegisflow",
+      "pattern": "cortexmatter.com/aegisflow*",
       "zone_name": "cortexmatter.com"
     },
     {

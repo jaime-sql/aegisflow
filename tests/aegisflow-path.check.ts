@@ -77,14 +77,13 @@ assert.equal(
 );
 
 const wrangler = readFileSync("workers/aegisflow-path/wrangler.jsonc", "utf8");
-assert.match(wrangler, /"pattern": "cortexmatter.com\/aegisflow"/);
+assert.match(wrangler, /"pattern": "cortexmatter.com\/aegisflow\*"/);
 assert.match(wrangler, /"pattern": "cortexmatter.com\/aegisflow\/\*"/);
-assert.equal(
-  [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].every((m) =>
-    m[1] === "cortexmatter.com/aegisflow" || m[1] === "cortexmatter.com/aegisflow/*",
-  ),
-  true,
+assert.deepEqual(
+  [...wrangler.matchAll(/"pattern":\s*"([^"]+)"/g)].map((m) => m[1]),
+  ["cortexmatter.com/aegisflow*", "cortexmatter.com/aegisflow/*"],
 );
+assert.match(wrangler, /__clerk_handshake/);
 assert.doesNotMatch(wrangler, /cortexmatter.com\/"/);
 assert.doesNotMatch(wrangler, /"pattern": "cortexmatter.com"/);
 assert.doesNotMatch(wrangler, /PAGES_ORIGIN/);
