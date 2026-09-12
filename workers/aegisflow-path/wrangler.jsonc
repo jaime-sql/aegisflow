@@ -10,7 +10,11 @@
   },
   "vars": {
     "BASE_PATH": "/aegisflow",
-    "PUBLIC_ORIGIN": "https://cortexmatter.com"
+    "PUBLIC_ORIGIN": "https://cortexmatter.com",
+    // OpenNext SSR fetches request.url. Binding to the inbound Host
+    // (cortexmatter.com or this Worker's workers.dev) re-enters this
+    // Worker and Cloudflare returns Error 1019.
+    "AEGISFLOW_ORIGIN": "https://aegisflow.jaime-8a8.workers.dev"
   },
   "services": [
     {

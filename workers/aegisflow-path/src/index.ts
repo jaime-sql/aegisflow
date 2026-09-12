@@ -1,8 +1,16 @@
-import { isAppPath, originPath, rewriteLocation } from "./path";
+import {
+  applyForwardedHeaders,
+  DEFAULT_AEGISFLOW_ORIGIN,
+  internalOriginUrl,
+  isAppPath,
+  rewriteLocation,
+} from "./path";
 
 export interface PathRouterEnv {
   BASE_PATH: string;
   PUBLIC_ORIGIN: string;
+  /** Origin of Worker `aegisflow` (workers.dev). Never the public custom domain. */
+  AEGISFLOW_ORIGIN?: string;
   /** Service binding to the OpenNext Worker named `aegisflow`. */
   AEGISFLOW?: { fetch: (input: Request) => Promise<Response> };
 }
@@ -57,12 +65,22 @@ const worker = {
       );
     }
 
-    const dest = new URL(url.href);
-    dest.pathname = originPath(url.pathname);
+    // Do not forward the inbound Host/URL. OpenNext SSR fetches request.url;
+    // cortexmatter.com and this Worker's own workers.dev both loop back here
+    // (Error 1019). Bind to the OpenNext origin that already works.
+    const dest = internalOriginUrl(
+      url,
+      env.AEGISFLOW_ORIGIN || DEFAULT_AEGISFLOW_ORIGIN,
+    );
+    const headers = applyForwardedHeaders(
+      filterRequestHeaders(request.headers),
+      url,
+      request.headers.get("cf-connecting-ip"),
+    );
 
     const init: RequestInit & { duplex?: "half" } = {
       method: request.method,
-      headers: filterRequestHeaders(request.headers),
+      headers,
       redirect: "manual",
     };
     if (request.method !== "GET" && request.method !== "HEAD") {

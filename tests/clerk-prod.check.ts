@@ -29,5 +29,13 @@ assert.match(
 const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
 assert.match(pathWorker, /publicResponseHeaders/);
 assert.match(pathWorker, /rewriteLocation/);
+assert.match(pathWorker, /internalOriginUrl/);
+assert.match(pathWorker, /applyForwardedHeaders/);
+
+const pathWrangler = readFileSync("workers/aegisflow-path/wrangler.jsonc", "utf8");
+assert.match(
+  pathWrangler,
+  /"AEGISFLOW_ORIGIN": "https:\/\/aegisflow\.jaime-8a8\.workers\.dev"/,
+);
 
 console.log("OK  clerk prod wiring (SSR provider, middleware, wrangler vars)");

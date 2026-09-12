@@ -84,9 +84,11 @@ In [Clerk Dashboard](https://dashboard.clerk.com) → the AegisFlow application 
 | Sign-up | `https://cortexmatter.com/aegisflow/sign-up` |
 | After sign-in | `https://cortexmatter.com/aegisflow/ops` |
 | After sign-up | `https://cortexmatter.com/aegisflow/ops` |
-| Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.jaime-8a8.workers.dev`, `https://aegisflow.pages.dev` |
+| Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.jaime-8a8.workers.dev` |
 
-Do **not** point Clerk at `https://cortexmatter.com/` (apex). That URL is reserved for other apps.
+The path Worker service-binds to `aegisflow` using the **workers.dev** origin (so Clerk SSR sees a host that already works). The **browser** still loads Clerk JS on `https://cortexmatter.com`, so the Dashboard **must** list that origin. Missing `cortexmatter.com` does not usually HTTP-500 the Worker (that was Error 1019); it breaks the Clerk widget / handshake in the browser.
+
+Do **not** point Clerk at `https://cortexmatter.com/` (apex). That URL is reserved for other apps. Do **not** add `https://aegisflow-path.jaime-8a8.workers.dev` unless you intend to use that hostname in a browser.
 
 The Cloudflare prod workflow inlines `NEXT_PUBLIC_CLERK_*` paths with the `/aegisflow` prefix from `next.config.ts`. The OpenNext Worker also receives those paths as Wrangler `vars`, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` as Worker **secrets**, so middleware can redirect to `/aegisflow/sign-in` at runtime. Local `.env.local` keeps the unprefixed `/sign-in` values.
 
@@ -102,6 +104,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | --- | --- |
 | `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. Prod paths are `/aegisflow/sign-in` etc. |
 | `BASE_PATH` / `CLOUDFLARE_PROD` | Prod `basePath` / `assetPrefix` = `/aegisflow`. Unset locally. |
+| `AEGISFLOW_ORIGIN` | Path Worker only. Service-bind dest = OpenNext `workers.dev` origin (never the inbound Host). |
 | `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
 | `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
@@ -128,7 +131,7 @@ workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only
 
 Locked prod URL: **https://cortexmatter.com/aegisflow**. The apex `cortexmatter.com/` stays free for other apps. The path Worker only claims `cortexmatter.com/aegisflow` and `cortexmatter.com/aegisflow/*`.
 
-Rosario can use static `output: "export"` because it has no middleware. AegisFlow cannot: Clerk `clerkMiddleware`, `auth.protect()`, `currentUser()`, `force-dynamic` Ops/Fabric pages, and `/api/ops/incident` need a Node-compatible Worker. **Adapter choice: `@opennextjs/cloudflare` (OpenNext)** deployed as Worker `aegisflow` (same name as the existing empty Pages project). Preview: `*.workers.dev` (`aegisflow.pages.dev` has **no** deployments and returns 522 — do not use it). Public traffic goes through Worker `aegisflow-path` via the `AEGISFLOW` service binding only. `npm run build` is webpack (not Turbopack) so OpenNext can emit a standalone Worker; `npm run dev` still uses Turbopack.
+Rosario can use static `output: "export"` because it has no middleware. AegisFlow cannot: Clerk `clerkMiddleware`, `auth.protect()`, `currentUser()`, `force-dynamic` Ops/Fabric pages, and `/api/ops/incident` need a Node-compatible Worker. **Adapter choice: `@opennextjs/cloudflare` (OpenNext)** deployed as Worker `aegisflow` (same name as the existing empty Pages project). Preview: `*.workers.dev` (`aegisflow.pages.dev` has **no** deployments and returns 522 — do not use it). Public traffic goes through Worker `aegisflow-path` via the `AEGISFLOW` service binding only. The path Worker **must** call that binding with the OpenNext origin (`AEGISFLOW_ORIGIN=https://aegisflow.jaime-8a8.workers.dev`), not the inbound `https://cortexmatter.com/...` URL. OpenNext SSR fetches `request.url`; if that host routes back to `aegisflow-path`, Cloudflare returns **Error 1019** (Worker self-recursion) as HTTP 503/500. `X-Forwarded-Host` / `X-Forwarded-Proto` preserve the public host; `Location` is still rewritten onto `cortexmatter.com`. `npm run build` is webpack (not Turbopack) so OpenNext can emit a standalone Worker; `npm run dev` still uses Turbopack.
 
 `basePath` / `assetPrefix` become `/aegisflow` when `CLOUDFLARE_PROD=true` or `BASE_PATH=/aegisflow`. Leaflet marker images live under `public/leaflet/` so they load as `/aegisflow/leaflet/...`. Next.js `Link` / `redirect()` already prefix `basePath`; raw URLs use `withBasePath()`.
 
@@ -136,14 +139,15 @@ Rosario can use static `output: "export"` because it has no middleware. AegisFlo
 
 Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing). Jaime must do this in the GitHub UI:
 
-1. **Clerk Dashboard** — add the production URLs in the table above (sign-in, after-sign-in, allowed origins). Do not use the apex as the app home URL.
-2. **GitHub → Settings → Secrets and variables → Actions** on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow):
+1. **Clerk Dashboard** — add the production URLs in the table above (sign-in, after-sign-in, allowed origins). `https://cortexmatter.com` **and** `https://aegisflow.jaime-8a8.workers.dev` are both required. Do not use the apex as the app home URL.
+2. **Cloudflare DNS** — Worker routes only fire when the hostname is proxied. The `cortexmatter.com` zone must have a proxied dummy A record (`192.0.2.1`, orange cloud) so `/aegisflow` reaches `aegisflow-path`. Without it the name is NXDOMAIN. Unmatched apex paths stay Error 1016 until another app adds a real origin.
+3. **GitHub → Settings → Secrets and variables → Actions** on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow):
    - `CLOUDFLARE_API_TOKEN` — Pages + Workers edit on account `8a8c9483df8e8a2a9adec437a0994fe4` (same token pattern as Rosario). Confirm this secret exists on **this** repo; it is not inherited from another project.
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
    - Optional: `FIRMS_MAP_KEY` (otherwise Ops uses the fixture). Set it as a Wrangler secret on Worker `aegisflow` if you want live FIRMS in prod.
-3. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads `CLERK_SECRET_KEY` **and** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as Worker secrets; path vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
-4. **QA smoke**
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads `CLERK_SECRET_KEY` **and** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as Worker secrets; path vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
    - `https://cortexmatter.com/aegisflow` → Clerk sign-in (`/aegisflow/sign-in`) or `/aegisflow/ops` after auth. Must **not** be HTTP 500.
    - Signed-out `/aegisflow/ops` → **redirect to sign-in** (not a Clerk 404 `protect-rewrite`).
@@ -154,6 +158,36 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - Direct Worker: `https://aegisflow.jaime-8a8.workers.dev/aegisflow` should behave the same (add this host under Clerk allowed origins).
 
 Do not connect Cloudflare Git auto-deploy to `main` if you want promotion to stay manual (`workflow_dispatch` / `prod-*` tags), matching Rosario.
+
+### Re-run Cloudflare Prod after the path-Worker 1019 fix
+
+After PR #3, `https://aegisflow.jaime-8a8.workers.dev/aegisflow/sign-in` returned **200**, but any request that entered through `aegisflow-path` (custom domain **or** `aegisflow-path.jaime-8a8.workers.dev`) still failed on SSR:
+
+| URL | Live result (2026-09-12) |
+| --- | --- |
+| `https://aegisflow.jaime-8a8.workers.dev/aegisflow/sign-in` | **200** Clerk chrome |
+| `https://aegisflow.jaime-8a8.workers.dev/aegisflow` | **307** → `/aegisflow/sign-in` |
+| `https://aegisflow-path.jaime-8a8.workers.dev/aegisflow` | **307** (middleware only) |
+| `https://aegisflow-path.jaime-8a8.workers.dev/aegisflow/sign-in` | **503 Error 1019** (Worker self-recursion) |
+| `https://cortexmatter.com/aegisflow` | **307** → `/aegisflow/sign-in` (after dummy A record) |
+| `https://cortexmatter.com/aegisflow/sign-in` | **503 Error 1019** (same loop as the path Worker hostname) |
+
+Root cause: `aegisflow-path` forwarded `new Request(https://<inbound-host>/aegisflow/...)`. OpenNext SSR with `global_fetch_strictly_public` fetches that URL; the host routes back into `aegisflow-path` → service bind → loop until Cloudflare Error 1019. Middleware redirects do not SSR, so `/` and `/ops` could 307 while `/sign-in` died.
+
+This is **not** Clerk rejecting `Host=cortexmatter.com` on the Worker (workers.dev keys already work). Jaime still needs `https://cortexmatter.com` in Clerk allowed origins for the **browser** widget.
+
+**Jaime re-run**
+
+1. Merge this PR to `main`.
+2. Confirm Actions secrets: `CLOUDFLARE_API_TOKEN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`.
+3. Clerk Dashboard → allowed origins / paths in the table above (`cortexmatter.com` **and** `aegisflow.jaime-8a8.workers.dev`).
+4. Cloudflare DNS for `cortexmatter.com`: proxied A `@` → `192.0.2.1` if no apex record exists yet.
+5. **Actions → Cloudflare Prod → Run workflow** (or push a new `prod-*` tag). The path Worker deploy picks up `AEGISFLOW_ORIGIN`.
+6. Smoke in a **real browser**:
+   - `https://aegisflow.jaime-8a8.workers.dev/aegisflow/sign-in` still **200** (must not regress).
+   - `https://aegisflow-path.jaime-8a8.workers.dev/aegisflow/sign-in` → **200** (no 1019).
+   - `https://cortexmatter.com/aegisflow` → sign-in or `/ops` — **not** 500/503.
+   - `/aegisflow/sign-in` → 200 + Clerk widget. `/aegisflow/ops` signed-out → redirect to sign-in.
 
 ### Re-run Cloudflare Prod after the 500 fix
 
