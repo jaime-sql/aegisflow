@@ -43,11 +43,14 @@ export function clerkPublicUrls(
   signUpUrl: string;
   afterSignInUrl: string;
   afterSignUpUrl: string;
+  afterSignOutUrl: string;
 } {
   return {
     signInUrl: withBasePath("/sign-in", env),
     signUpUrl: withBasePath("/sign-up", env),
     afterSignInUrl: withBasePath("/ops", env),
     afterSignUpUrl: withBasePath("/ops", env),
+    // Never `/` — apex cortexmatter.com/ is a dummy A (522). Stay under basePath.
+    afterSignOutUrl: withBasePath("/sign-in", env),
   };
 }

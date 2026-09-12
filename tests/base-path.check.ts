@@ -20,11 +20,19 @@ assert.equal(
 const localClerk = clerkPublicUrls({});
 assert.equal(localClerk.signInUrl, "/sign-in");
 assert.equal(localClerk.afterSignInUrl, "/ops");
+assert.equal(localClerk.afterSignOutUrl, "/sign-in");
 
 const prodClerk = clerkPublicUrls({ BASE_PATH: "/aegisflow" });
 assert.equal(prodClerk.signInUrl, "/aegisflow/sign-in");
 assert.equal(prodClerk.signUpUrl, "/aegisflow/sign-up");
 assert.equal(prodClerk.afterSignInUrl, "/aegisflow/ops");
 assert.equal(prodClerk.afterSignUpUrl, "/aegisflow/ops");
+assert.equal(prodClerk.afterSignOutUrl, "/aegisflow/sign-in");
+assert.ok(prodClerk.afterSignOutUrl.startsWith("/aegisflow"));
+assert.notEqual(prodClerk.afterSignOutUrl, "/");
+assert.doesNotMatch(prodClerk.afterSignOutUrl, /^https?:\/\/cortexmatter\.com\/?$/);
+
+const cfClerk = clerkPublicUrls({ CLOUDFLARE_PROD: "true" });
+assert.equal(cfClerk.afterSignOutUrl, "/aegisflow/sign-in");
 
 console.log("OK  base-path + Clerk URL helpers");
