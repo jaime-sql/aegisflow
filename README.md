@@ -84,6 +84,7 @@ In [Clerk Dashboard](https://dashboard.clerk.com) → the AegisFlow application 
 | Sign-up | `https://cortexmatter.com/aegisflow/sign-up` |
 | After sign-in | `https://cortexmatter.com/aegisflow/ops` |
 | After sign-up | `https://cortexmatter.com/aegisflow/ops` |
+| After sign-out | `https://cortexmatter.com/aegisflow/sign-in` |
 | Allowed redirect origins | `https://cortexmatter.com`, `https://aegisflow.jaime-8a8.workers.dev` |
 
 The path Worker service-binds to `aegisflow` using the **workers.dev** origin (so Clerk SSR sees a host that already works). The **browser** still loads Clerk JS on `https://cortexmatter.com`, so the Dashboard **must** list that origin. Missing `cortexmatter.com` does not usually HTTP-500 the Worker (that was Error 1019); it breaks the Clerk widget / handshake in the browser.
@@ -152,6 +153,7 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - `https://cortexmatter.com/aegisflow` → Clerk sign-in (`/aegisflow/sign-in`) or `/aegisflow/ops` after auth. Must **not** be HTTP 500.
    - Signed-out `/aegisflow/ops` → **redirect to sign-in** (not a Clerk 404 `protect-rewrite`).
    - Sign-in / sign-up stay under `/aegisflow/...` and return 200 with the Clerk widget (Dev keys show Clerk’s development banner).
+   - UserButton **Sign out** → `/aegisflow/sign-in` (must **not** hang on a spinner or navigate to apex `cortexmatter.com/`).
    - Map tiles + `/aegisflow/_next/...` + `/aegisflow/leaflet/...` load.
    - Viewer vs Manager still works (Clerk `publicMetadata.role`).
    - Fabric twin: `https://cortexmatter.com/aegisflow/fabric`.

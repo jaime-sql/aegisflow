@@ -20,8 +20,16 @@ assert.match(signUp, /clerkAuthAppearance/);
 
 const gate = readFileSync("src/components/providers/ClerkGate.tsx", "utf8");
 assert.match(gate, /ClerkProvider/);
+assert.match(gate, /afterSignOutUrl=\{urls\.afterSignOutUrl\}/);
 assert.doesNotMatch(gate, /useEffect\s*\(/);
 assert.doesNotMatch(gate, /import\("@clerk\/nextjs"\)/);
+
+const userButton = readFileSync("src/components/ops/ClerkUserButton.tsx", "utf8");
+assert.match(userButton, /afterSignOutUrl=\{afterSignOutUrl\}/);
+assert.match(userButton, /clerkPublicUrls/);
+
+const nextConfig = readFileSync("next.config.ts", "utf8");
+assert.match(nextConfig, /NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL: clerkUrls\.afterSignOutUrl/);
 
 const middleware = readFileSync("src/middleware.ts", "utf8");
 assert.match(middleware, /signInRedirectUrl/);
@@ -33,6 +41,7 @@ const wrangler = readFileSync("wrangler.jsonc", "utf8");
 assert.match(wrangler, /"CLOUDFLARE_PROD": "true"/);
 assert.match(wrangler, /"BASE_PATH": "\/aegisflow"/);
 assert.match(wrangler, /"NEXT_PUBLIC_CLERK_SIGN_IN_URL": "\/aegisflow\/sign-in"/);
+assert.match(wrangler, /"NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL": "\/aegisflow\/sign-in"/);
 assert.match(wrangler, /"NEXTJS_ENV": "production"/);
 
 const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
