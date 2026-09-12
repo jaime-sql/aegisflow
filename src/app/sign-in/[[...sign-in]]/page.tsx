@@ -1,5 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 import { AuthChrome } from "@/components/ops/AuthFrame";
+import { clerkAuthAppearance } from "@/lib/auth/clerk-appearance";
 import { isClerkConfigured } from "@/lib/auth/config";
 import { clerkPublicUrls } from "@/lib/base-path";
 
@@ -16,15 +17,7 @@ export default function SignInPage() {
         routing="path"
         signUpUrl={urls.signUpUrl}
         fallbackRedirectUrl={urls.afterSignInUrl}
-        appearance={{
-          variables: {
-            colorBackground: "#121A2B",
-            colorText: "#E8EEF9",
-            colorPrimary: "#FF4D2E",
-            colorInputBackground: "#0B1220",
-            colorInputText: "#E8EEF9",
-          },
-        }}
+        appearance={clerkAuthAppearance}
       />
     </AuthChrome>
   );

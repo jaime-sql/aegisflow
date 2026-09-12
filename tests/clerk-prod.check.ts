@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+const appearance = readFileSync("src/lib/auth/clerk-appearance.ts", "utf8");
+assert.match(appearance, /colorText: "#E8EEF9"/);
+assert.match(appearance, /socialButtonsBlockButton:/);
+assert.match(appearance, /backgroundColor: "#0B1220"/);
+assert.match(appearance, /border: "1px solid #1E2A40"/);
+assert.match(appearance, /color: "#E8EEF9"/);
+assert.match(appearance, /backgroundColor: "#162033"/);
+assert.match(appearance, /color: "#FFFFFF"/);
+assert.match(appearance, /socialButtonsBlockButtonText:/);
+assert.match(appearance, /socialButtonsProviderIcon:/);
+assert.match(appearance, /color: "#8B9BB8"/);
+
+const signIn = readFileSync("src/app/sign-in/[[...sign-in]]/page.tsx", "utf8");
+const signUp = readFileSync("src/app/sign-up/[[...sign-up]]/page.tsx", "utf8");
+assert.match(signIn, /clerkAuthAppearance/);
+assert.match(signUp, /clerkAuthAppearance/);
+
 const gate = readFileSync("src/components/providers/ClerkGate.tsx", "utf8");
 assert.match(gate, /ClerkProvider/);
 assert.doesNotMatch(gate, /useEffect\s*\(/);
