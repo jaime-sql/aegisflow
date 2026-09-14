@@ -1,8 +1,9 @@
-"use client";
-
-import { ClerkProvider } from "@clerk/nextjs";
+// Server Component — no "use client" here so that clerkPublicUrls() can read
+// server-only env vars (CLOUDFLARE_PROD, BASE_PATH) and compute the correct
+// basePath-prefixed URLs before passing them to the client ClerkProvider.
 import type { ReactNode } from "react";
 import { clerkPublicUrls } from "@/lib/base-path";
+import { ClerkProviderClient } from "./ClerkProviderClient";
 
 /**
  * Must render ClerkProvider on the first SSR pass when keys exist.
@@ -22,7 +23,7 @@ export function ClerkGate({
 
   const urls = clerkPublicUrls();
   return (
-    <ClerkProvider
+    <ClerkProviderClient
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       signInUrl={urls.signInUrl}
       signUpUrl={urls.signUpUrl}
@@ -31,6 +32,6 @@ export function ClerkGate({
       afterSignOutUrl={urls.afterSignOutUrl}
     >
       {children}
-    </ClerkProvider>
+    </ClerkProviderClient>
   );
 }
