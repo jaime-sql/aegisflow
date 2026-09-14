@@ -13,7 +13,11 @@ export default function SignInPage() {
   return (
     <AuthChrome clerkEnabled>
       <SignIn
-        path={urls.signInUrl}
+        // Clerk's `path` prop must be relative to Next.js basePath.
+        // Next.js strips /aegisflow before Clerk sees the URL, so passing
+        // urls.signInUrl (/aegisflow/sign-in) causes Clerk to never match
+        // the route and the widget never mounts. Use the bare path instead.
+        path="/sign-in"
         routing="path"
         signUpUrl={urls.signUpUrl}
         fallbackRedirectUrl={urls.afterSignInUrl}

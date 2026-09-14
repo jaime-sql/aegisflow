@@ -13,7 +13,9 @@ export default function SignUpPage() {
   return (
     <AuthChrome clerkEnabled>
       <SignUp
-        path={urls.signUpUrl}
+        // Same fix as sign-in: path must be basePath-relative.
+        // Next.js strips /aegisflow before Clerk processes the URL.
+        path="/sign-up"
         routing="path"
         signInUrl={urls.signInUrl}
         fallbackRedirectUrl={urls.afterSignUpUrl}
