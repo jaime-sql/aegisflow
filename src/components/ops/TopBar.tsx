@@ -54,7 +54,7 @@ export function TopBar({
                 title={feed.detail}
                 className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]"
               >
-                {feed.label.replace("NASA ", "").replace(" / IoT", "")}
+                {feed.label.replace("NASA ", "")}
                 <span className={`h-1.5 w-1.5 rounded-full ${feedDotClass(feed.status)}`} />
                 <span className="text-[#E8EEF9]">{feedDisplay(feed.status)}</span>
               </span>

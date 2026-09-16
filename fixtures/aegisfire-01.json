@@ -208,7 +208,7 @@
       "lineage": [
         { "eventId": "evt_aegisfire01_hotspot_01", "kind": "hotspot", "label": "FIRMS VIIRS 44.3042N 121.6418W FRP 48 MW" },
         { "eventId": "evt_aegisfire01_hotspot_03", "kind": "hotspot", "label": "FIRMS VIIRS northeast run" },
-        { "eventId": "evt_aegisfire01_wind_01", "kind": "wind", "label": "Mock wind 12.4 m/s from 242°" },
+        { "eventId": "evt_aegisfire01_wind_01", "kind": "wind", "label": "WeatherNext 10m 12.4 m/s from 242° · Experimental" },
         { "eventId": "evt_aegisfire01_sop_nwcg_spread", "kind": "sop", "label": "NWCG spread / spotting guidance (RAG pack stub)" }
       ],
       "model": { "primary": "openai", "backup": "deepseek", "used": "fixture", "runtime": "local" },
@@ -240,7 +240,7 @@
       ],
       "lineage": [
         { "eventId": "evt_aegisfire01_hotspot_06", "kind": "hotspot", "label": "Low-confidence leading edge toward WUI" },
-        { "eventId": "evt_aegisfire01_wind_03", "kind": "wind", "label": "Sisters grid wind 9.6 m/s" },
+        { "eventId": "evt_aegisfire01_wind_03", "kind": "wind", "label": "WeatherNext Sisters grid 9.6 m/s · Experimental" },
         { "eventId": "evt_aegisfire01_crowd_01", "kind": "crowd", "label": "PII-scrubbed Camp Polk smoke report" },
         { "eventId": "evt_aegisfire01_sop_evac", "kind": "sop", "label": "County evac SOP (RAG pack stub)" }
       ],
@@ -282,7 +282,7 @@
       "lineage": [
         { "eventId": "evt_aegisfire01_agent_propagation", "kind": "feed", "label": "Propagation envelope" },
         { "eventId": "evt_aegisfire01_agent_evacuation", "kind": "feed", "label": "Hwy 20 egress plan" },
-        { "eventId": "evt_aegisfire01_wind_04", "kind": "wind", "label": "North-flank gusts 19 m/s" }
+        { "eventId": "evt_aegisfire01_wind_04", "kind": "wind", "label": "WeatherNext north-flank gusts 19 m/s · Experimental" }
       ],
       "model": { "primary": "openai", "backup": "deepseek", "used": "fixture", "runtime": "local" },
       "producedAt": "2026-09-10T19:10:00.000Z"
@@ -302,9 +302,9 @@
       },
       {
         "id": "wind",
-        "label": "Wind / IoT",
+        "label": "WeatherNext",
         "status": "ok",
-        "detail": "Mock vector field — Stage 1",
+        "detail": "Fixture wind (no GCP_SA_JSON) — WeatherNext live skipped",
         "lastSuccessAt": "2026-09-10T19:00:00.000Z"
       },
       {

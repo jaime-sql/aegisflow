@@ -1,74 +1,159 @@
 import type { FeedComponent, WindTick } from "@/lib/schema";
-import { SCHEMA_VERSION } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import { runBigQuerySql } from "./bigquery";
+import { fetchGcpAccessToken, loadServiceAccountFromEnv } from "./gcp-auth";
+import type { IngestFetch, IngestEnv, IngestRegion } from "./types";
+import {
+  WEATHERNEXT_CATALOG,
+  buildWeatherNextWindSql,
+  mapWeatherNextRowsToWindTicks,
+  parseWeatherNextQueryRows,
+  resolveWeatherNextTable,
+} from "./weathernext";
+import type { WeatherNextQueryClient } from "./weathernext";
 
 export type WindResult = {
   wind: WindTick[];
   health: FeedComponent;
+  usedFixture: boolean;
 };
 
-type Center = { lat: number; lon: number };
+export type WindFetchDeps = {
+  fetch?: IngestFetch;
+  client?: WeatherNextQueryClient;
+  env?: IngestEnv;
+};
 
-function mockField(center: Center, at: string): WindTick[] {
-  const offsets: Array<[number, number, number, number]> = [
-    [-0.02, -0.08, 12.4, 242],
-    [0.01, -0.04, 11.1, 248],
-    [-0.03, 0.01, 9.6, 236],
-    [0.03, -0.02, 13.2, 251],
-    [-0.05, -0.11, 10.4, 239],
-    [0.02, 0.04, 8.8, 244],
-  ];
+function fixtureWind(): WindTick[] {
+  return loadFixtureIncident().wind;
+}
 
-  return offsets.map((row, i) => {
-    const [dLat, dLon, speed, dir] = row;
-    const tick: WindTick = {
-      eventId: `evt_aegisfire01_wind_${String(i + 1).padStart(2, "0")}`,
-      schemaVersion: SCHEMA_VERSION,
-      lat: center.lat + dLat,
-      lon: center.lon + dLon,
-      speedMps: speed,
-      directionDeg: dir,
-      gustMps: Number((speed * 1.45).toFixed(1)),
-      observedAt: at,
-      source: "MOCK_WIND",
-    };
-    return tick;
-  });
+function weatherNextHealth(
+  status: FeedComponent["status"],
+  detail: string,
+  lastSuccessAt: string | null,
+): FeedComponent {
+  return {
+    id: "wind",
+    label: "WeatherNext",
+    status,
+    detail,
+    lastSuccessAt,
+  };
+}
+
+function liveWeatherNextEnabled(env: IngestEnv): boolean {
+  if (env.AEGISFLOW_USE_WEATHERNEXT_FIXTURE === "true") return false;
+  if (env.AEGISFLOW_LIVE_WEATHERNEXT === "false") return false;
+  return Boolean(
+    env.GCP_SA_JSON?.trim() ||
+      env.GOOGLE_APPLICATION_CREDENTIALS_JSON?.trim() ||
+      env.GOOGLE_APPLICATION_CREDENTIALS?.trim(),
+  );
+}
+
+async function queryViaBigQuery(
+  region: IngestRegion,
+  env: IngestEnv,
+  doFetch: IngestFetch,
+): Promise<WindTick[]> {
+  const sa = loadServiceAccountFromEnv(env);
+  if (!sa) {
+    throw new Error("no GCP service-account credentials");
+  }
+  const table = resolveWeatherNextTable(env);
+  const token = await fetchGcpAccessToken(sa, { fetch: doFetch });
+  const sql = buildWeatherNextWindSql(region.bbox, table);
+  const { fields, rows } = await runBigQuerySql(
+    sql,
+    { projectId: table.projectId, location: table.location },
+    token,
+    { fetch: doFetch },
+  );
+  return mapWeatherNextRowsToWindTicks(parseWeatherNextQueryRows(fields, rows));
 }
 
 /**
- * Stage 1 wind adapter: deterministic mock vectors.
- * Swap for live IoT later; throw/degrade is isolated from FIRMS.
+ * WeatherNext 10 m wind over the ops bbox (BigQuery Analytics Hub tables).
+ * Falls back to AegisFire-01 fixture when credentials are missing or the
+ * query fails (graceful degrade — Ops stays up).
  */
-export async function fetchWindTicks(center: Center): Promise<WindResult> {
+export async function fetchWindTicks(
+  region: IngestRegion,
+  deps: WindFetchDeps = {},
+): Promise<WindResult> {
   const now = new Date().toISOString();
+  const env = deps.env ?? process.env;
+  const fixture = fixtureWind();
+
   try {
-    if (process.env.AEGISFLOW_FAIL_WIND === "true") {
+    if (env.AEGISFLOW_FAIL_WIND === "true") {
       throw new Error("forced wind adapter failure");
     }
-    const fixture = loadFixtureIncident();
-    const wind = fixture.wind.length ? fixture.wind : mockField(center, now);
+
+    if (!liveWeatherNextEnabled(env) && !deps.client) {
+      return {
+        wind: fixture,
+        usedFixture: true,
+        health: weatherNextHealth(
+          "ok",
+          "Fixture wind (no GCP_SA_JSON) — WeatherNext live skipped",
+          fixture[0]?.observedAt ?? now,
+        ),
+      };
+    }
+
+    const wind = deps.client
+      ? mapWeatherNextRowsToWindTicks(
+          await deps.client.queryWind(
+            buildWeatherNextWindSql(region.bbox, resolveWeatherNextTable(env)),
+          ),
+        )
+      : await queryViaBigQuery(region, env, deps.fetch ?? fetch);
+
+    if (wind.length === 0) {
+      return {
+        wind: fixture.map((w) => ({ ...w, degraded: true })),
+        usedFixture: true,
+        health: weatherNextHealth(
+          "degraded",
+          "WeatherNext returned 0 cells — using fixture · Experimental",
+          now,
+        ),
+      };
+    }
+
+    const table = resolveWeatherNextTable(env);
     return {
       wind,
-      health: {
-        id: "wind",
-        label: "Wind / IoT",
-        status: "ok",
-        detail: "Mock vector field — Stage 1",
-        lastSuccessAt: wind[0]?.observedAt ?? now,
-      },
+      usedFixture: false,
+      health: weatherNextHealth(
+        "ok",
+        `Experimental · ${table.tableId} · ${wind.length} 10m cells · ${WEATHERNEXT_CATALOG.gcpProjectId}`,
+        wind[0]?.observedAt ?? now,
+      ),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown wind error";
+    if (env.AEGISFLOW_FAIL_WIND === "true") {
+      return {
+        wind: [],
+        usedFixture: true,
+        health: weatherNextHealth(
+          "down",
+          `Wind adapter failed (${message}) — map continues without vectors`,
+          null,
+        ),
+      };
+    }
     return {
-      wind: [],
-      health: {
-        id: "wind",
-        label: "Wind / IoT",
-        status: "down",
-        detail: `Wind adapter failed (${message}) — map continues without vectors`,
-        lastSuccessAt: null,
-      },
+      wind: fixture.map((w) => ({ ...w, degraded: true })),
+      usedFixture: true,
+      health: weatherNextHealth(
+        "degraded",
+        `WeatherNext pull failed (${message}) — fixture in use · Experimental`,
+        fixture[0]?.observedAt ?? null,
+      ),
     };
   }
 }

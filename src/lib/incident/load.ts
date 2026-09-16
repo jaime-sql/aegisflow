@@ -29,7 +29,7 @@ export async function loadOpsIncident(): Promise<IncidentEvent> {
 
   const [firms, wind] = await Promise.all([
     fetchFirmsHotspots(base.region.bbox),
-    fetchWindTicks(base.region.center),
+    fetchWindTicks({ bbox: base.region.bbox, center: base.region.center }),
   ]);
 
   const agents = await runAllAgents({
