@@ -7,6 +7,7 @@ import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
 import { PUBLIC_CROWD_COPY } from "@/lib/pii";
 import { withBasePath } from "@/lib/base-path";
 import { SimBadge } from "./SimBadge";
+import { ExperimentalBadge } from "./ExperimentalBadge";
 
 const leafletIconPath = withBasePath("/leaflet");
 
@@ -98,7 +99,7 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
         weight: 0,
       })
         .bindPopup(
-          `<div style="font-family:ui-monospace,monospace">${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
+          `<div style="font-family:ui-monospace,monospace">${w.source === "WEATHERNEXT" ? "WeatherNext · Experimental<br/>" : ""}${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
         )
         .addTo(map);
     }
@@ -154,13 +155,14 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
             <span className="h-2.5 w-2.5 rounded-full bg-[#FF4D2E]" /> Hotspot
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-0.5 w-4 bg-[#3DB9FF]" /> Wind
+            <span className="h-0.5 w-4 bg-[#3DB9FF]" /> Wind overlay
           </div>
           <div className="flex items-center gap-2">
             <span className="h-0.5 w-4 bg-[#3DDC97]" /> Corridor
           </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
+          <ExperimentalBadge label="WeatherNext" />
           <SimBadge label="RF" />
           <SimBadge label="Edge" />
         </div>

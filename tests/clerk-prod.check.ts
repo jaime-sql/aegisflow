@@ -43,14 +43,19 @@ assert.match(wrangler, /"BASE_PATH": "\/aegisflow"/);
 assert.match(wrangler, /"NEXT_PUBLIC_CLERK_SIGN_IN_URL": "\/aegisflow\/sign-in"/);
 assert.match(wrangler, /"NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL": "\/aegisflow\/sign-in"/);
 assert.match(wrangler, /"NEXTJS_ENV": "production"/);
+assert.match(wrangler, /"GCP_PROJECT_ID": "aegisflow-ieee-quest"/);
+assert.match(wrangler, /"WEATHERNEXT_BQ_DATASET": "weathernext"/);
+assert.match(wrangler, /"WEATHERNEXT_BQ_TABLE": "weathernext_3_0_0_0p1deg"/);
 
 const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
 assert.match(workflow, /command: deploy/);
 assert.match(workflow, /CLERK_SECRET_KEY/);
 assert.match(
   workflow,
-  /secrets: \|[\s\S]*CLERK_SECRET_KEY[\s\S]*NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/,
+  /secrets: \|[\s\S]*CLERK_SECRET_KEY[\s\S]*NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY[\s\S]*FIRMS_MAP_KEY[\s\S]*GCP_SA_JSON/,
 );
+assert.match(workflow, /FIRMS_MAP_KEY/);
+assert.match(workflow, /GCP_SA_JSON/);
 
 const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
 assert.match(pathWorker, /publicResponseHeaders/);

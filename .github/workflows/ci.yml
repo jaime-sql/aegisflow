@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      # Adapters must fixture-fallback. Do not provide live FIRMS / GCP keys in CI.
+      - run: npm test
+        env:
+          FIRMS_MAP_KEY: ""
+          GCP_SA_JSON: ""
+          GOOGLE_APPLICATION_CREDENTIALS: ""
+          AEGISFLOW_LIVE_WEATHERNEXT: "false"
