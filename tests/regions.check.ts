@@ -192,9 +192,13 @@ function uiWiring() {
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /drawIncidentLayers/);
   assert.match(map, /fitBounds/);
-  assert.match(map, /ExperimentalBadge/);
+  assert.match(map, /MapLegendStack/);
+  assert.match(map, /isFirmsDemoFixture/);
   assert.match(map, /#3DB9FF/);
-  assert.match(map, /SimBadge label="RF"/);
+  const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
+  assert.match(stack, /ExperimentalBadge/);
+  assert.match(stack, /SimBadge label="RF"/);
+  assert.match(stack, /DemoFixtureChip/);
 
   const route = readFileSync("src/app/api/ops/incident/route.ts", "utf8");
   assert.match(route, /searchParams\.get\("region"\)/);

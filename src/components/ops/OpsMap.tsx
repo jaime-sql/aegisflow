@@ -6,8 +6,8 @@ import "leaflet/dist/leaflet.css";
 import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
 import { PUBLIC_CROWD_COPY } from "@/lib/pii";
 import { withBasePath } from "@/lib/base-path";
-import { SimBadge } from "./SimBadge";
-import { ExperimentalBadge } from "./ExperimentalBadge";
+import { isFirmsDemoFixture, hotspotPopupHtml } from "@/lib/ui/firms-demo";
+import { MapLegendStack } from "./MapLegendStack";
 
 const leafletIconPath = withBasePath("/leaflet");
 
@@ -27,6 +27,7 @@ function windDest(w: WindTick): [number, number] {
 
 function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
   group.clearLayers();
+  const firmsDemoFixture = isFirmsDemoFixture(incident);
 
   for (const h of incident.hotspots) {
     L.circleMarker([h.lat, h.lon], {
@@ -36,12 +37,7 @@ function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
       fillColor: hotspotColor(h.confidence),
       fillOpacity: 0.9,
     })
-      .bindPopup(
-        `<div style="font-family:ui-monospace,monospace">
-            <div style="color:#FF4D2E">${h.eventId}</div>
-            <div>${h.confidence} · ${h.brightnessK.toFixed(0)} K</div>
-          </div>`,
-      )
+      .bindPopup(hotspotPopupHtml(h, firmsDemoFixture))
       .addTo(group);
   }
 
@@ -203,11 +199,7 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-1">
-          <ExperimentalBadge label="WeatherNext" />
-          <SimBadge label="RF" />
-          <SimBadge label="Edge" />
-        </div>
+        <MapLegendStack firmsDemoFixture={isFirmsDemoFixture(incident)} />
       </div>
       {incident.region.placeholder && (
         <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-[#FFB020]/40 bg-[#121A2B]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#FFB020]">

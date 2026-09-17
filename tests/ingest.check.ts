@@ -349,10 +349,14 @@ async function loadIncidentDegradedStaysUp() {
 
 function uiWiring() {
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
-  assert.match(map, /ExperimentalBadge/);
+  assert.match(map, /MapLegendStack/);
+  assert.match(map, /isFirmsDemoFixture/);
   assert.match(map, /#3DB9FF/);
-  assert.match(map, /SimBadge label="RF"/);
-  assert.match(map, /SimBadge label="Edge"/);
+  const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
+  assert.match(stack, /ExperimentalBadge/);
+  assert.match(stack, /SimBadge label="RF"/);
+  assert.match(stack, /SimBadge label="Edge"/);
+  assert.match(stack, /DemoFixtureChip/);
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);
