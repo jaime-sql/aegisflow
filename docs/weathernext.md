@@ -60,9 +60,16 @@ fetchWindTicks(region: { bbox: BBox; center: GeoPoint }, deps?: {
 }): Promise<WindResult>
 ```
 
-Live path: service-account JWT → `oauth2.googleapis.com/token` → BigQuery `jobs.query` REST (no `@google-cloud/bigquery`; that client is not Worker-friendly). Rows map to `WindTick` (`source: "WEATHERNEXT"`, `schemaVersion: 1.0.0`, `eventId` prefix `evt_aegisfire01_wn_`).
+Live path: service-account JWT → `oauth2.googleapis.com/token` → BigQuery `jobs.query` REST (no `@google-cloud/bigquery`; that client is not Worker-friendly). The Ops SQL is scoped for the Worker budget:
 
-Missing `GCP_SA_JSON` → AegisFire-01 fixture, feed `ok`. Query/auth failure or 0 cells → fixture + FeedBanner (`degraded`). `AEGISFLOW_FAIL_WIND=true` → empty vectors + `down` (test hook). Force fixture even with creds: `AEGISFLOW_USE_WEATHERNEXT_FIXTURE=true`.
+- `init_time` lookback on **both** the latest-init CTE and the base table (partition prune; default 12 hours)
+- clustered `geography` intersected with the **active region bbox** (El Salvador / WUI by default)
+- lead hours `BETWEEN 1 AND 6` (nearest hour in that window)
+- `LIMIT 24` cells (map samples 16)
+
+`jobs.query` waits ~12s, then **one** `getQueryResults` poll. If the job is still running, the adapter fails fast to the fixture (does not hang the Worker). Rows map to `WindTick` (`source: "WEATHERNEXT"`, `schemaVersion: 1.0.0`, `eventId` prefix `evt_aegisfire01_wn_`). Cyan overlay + TopBar **Live** are only used when this query finishes.
+
+Missing `GCP_SA_JSON` → AegisFire-01 fixture, feed `ok`. Query/auth/timeout or 0 cells → fixture + FeedBanner (`Degraded · Wind · fallback`) plus the existing WeatherNext **Experimental** chip. Raw BigQuery timeout strings are never shown. `AEGISFLOW_FAIL_WIND=true` → empty vectors + `down` (test hook). Force fixture even with creds: `AEGISFLOW_USE_WEATHERNEXT_FIXTURE=true`.
 
 ## Jaime — enable live wind
 

@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fetchFirmsHotspots } from "../src/lib/ingest/firms";
 import { fetchWindTicks } from "../src/lib/ingest/wind";
+import {
+  BQ_JOB_TIMEOUT_CODE,
+  BQ_MAX_BYTES_BILLED,
+  runBigQuerySql,
+} from "../src/lib/ingest/bigquery";
 import { resetGcpTokenCache, signServiceAccountJwt } from "../src/lib/ingest/gcp-auth";
 import type { GcpServiceAccount } from "../src/lib/ingest/gcp-auth";
 import {
   WEATHERNEXT_CATALOG,
+  WEATHERNEXT_OPS_QUERY,
   bboxPolygonWkt,
   buildWeatherNextWindSql,
   mapWeatherNextRowsToWindTicks,
@@ -14,8 +20,18 @@ import {
   windDirectionFromUv,
 } from "../src/lib/ingest/weathernext";
 import { loadOpsIncident } from "../src/lib/incident/load";
+import { EL_SALVADOR_BBOX } from "../src/lib/regions";
 import { WindTickSchema, parseIncidentEvent } from "../src/lib/schema/zod";
 import { isFeedUnhealthy } from "../src/lib/ui/status";
+import {
+  WIND_FALLBACK_COLOR,
+  WIND_FALLBACK_DETAIL,
+  WIND_LIVE_COLOR,
+  WIND_OFFLINE_DETAIL,
+  isLiveWeatherNextWind,
+  publicWindBannerDetail,
+  windOverlayColor,
+} from "../src/lib/ui/wind-feed";
 import type { IngestEnv, IngestFetch } from "../src/lib/ingest/types";
 
 const BBOX = [-121.92, 44.12, -121.28, 44.52] as [number, number, number, number];
@@ -165,6 +181,9 @@ async function windLiveClient() {
         assert.match(sql, /weathernext_3_0_0_0p1deg/);
         assert.match(sql, /ST_INTERSECTS/);
         assert.match(sql, /wind_speed_10m_mean/);
+        assert.match(sql, /INTERVAL 12 HOUR/);
+        assert.match(sql, /f\.hours BETWEEN 1 AND 6/);
+        assert.match(sql, /LIMIT 24/);
         return [
           {
             lat: 44.31,
@@ -199,7 +218,12 @@ async function windQueryFail() {
   });
   assert.equal(result.usedFixture, true);
   assert.equal(result.health.status, "degraded");
-  assert.match(result.health.detail, /WeatherNext pull failed/);
+  assert.equal(result.health.detail, WIND_FALLBACK_DETAIL);
+  assert.doesNotMatch(result.health.detail, /BigQuery|timeout|403/i);
+  assert.equal(
+    publicWindBannerDetail(result.health.status, "BigQuery job did not complete within timeout"),
+    WIND_FALLBACK_DETAIL,
+  );
   assert.equal(isFeedUnhealthy({ overall: "degraded", feeds: [result.health], eventId: "evt_x_feed", schemaVersion: "1.0.0", producedAt: new Date().toISOString() }), true);
 }
 
@@ -209,6 +233,7 @@ async function windForcedDown() {
   });
   assert.equal(result.wind.length, 0);
   assert.equal(result.health.status, "down");
+  assert.equal(result.health.detail, WIND_OFFLINE_DETAIL);
 }
 
 async function catalogAndSql() {
@@ -224,6 +249,26 @@ async function catalogAndSql() {
   const sql = buildWeatherNextWindSql(BBOX, table);
   assert.match(sql, /`aegisflow-ieee-quest\.weathernext\.weathernext_3_0_0_0p1deg`/);
   assert.match(sql, /POLYGON\(\(-121\.9200 44\.1200/);
+  assert.equal(
+    [...sql.matchAll(/INTERVAL 12 HOUR/g)].length,
+    2,
+    "init_time lookback must apply to CTE and base table",
+  );
+  assert.match(sql, /t\.init_time = latest\.init_time/);
+  assert.match(sql, /ST_INTERSECTS\(t\.geography,/);
+  assert.doesNotMatch(sql, /geography_polygon/);
+  assert.match(
+    sql,
+    new RegExp(
+      `f\\.hours BETWEEN ${WEATHERNEXT_OPS_QUERY.leadHourMin} AND ${WEATHERNEXT_OPS_QUERY.leadHourMax}`,
+    ),
+  );
+  assert.match(sql, new RegExp(`LIMIT ${WEATHERNEXT_OPS_QUERY.cellLimit}`));
+  assert.doesNotMatch(sql, /INTERVAL 48 HOUR/);
+  assert.doesNotMatch(sql, /LEAST\(48/);
+  const sqlEs = buildWeatherNextWindSql(EL_SALVADOR_BBOX, table);
+  assert.match(sqlEs, /POLYGON\(\(-90\.2000 13\.1000/);
+  assert.match(sqlEs, /-87\.6500 14\.4800/);
   assert.equal(bboxPolygonWkt(BBOX).startsWith("POLYGON"), true);
 
   const dir = windDirectionFromUv(10.95, 5.85);
@@ -308,6 +353,167 @@ async function jwtAndBigQueryHttp() {
   WindTickSchema.parse(result.wind[0]);
 }
 
+function liveBqPayload(jobComplete = true) {
+  return {
+    jobComplete,
+    jobReference: {
+      projectId: "aegisflow-ieee-quest",
+      jobId: "job_wind_1",
+      location: "US",
+    },
+    schema: {
+      fields: [
+        { name: "lat" },
+        { name: "lon" },
+        { name: "forecast_time" },
+        { name: "speed_mps" },
+        { name: "gust_mps" },
+        { name: "u" },
+        { name: "v" },
+      ],
+    },
+    rows: [
+      {
+        f: [
+          { v: "13.69" },
+          { v: "-89.22" },
+          { v: "1768000000" },
+          { v: "9.6" },
+          { v: "14.2" },
+          { v: "8.1" },
+          { v: "5.2" },
+        ],
+      },
+    ],
+  };
+}
+
+async function bigQueryIncompleteThenPollSucceeds() {
+  resetGcpTokenCache();
+  const sa = await testServiceAccount();
+  const calls: string[] = [];
+  const doFetch: IngestFetch = async (input, init) => {
+    const url = String(input);
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url.includes("oauth2.googleapis.com")) {
+      return jsonResponse({ access_token: "ya29.poll-token", expires_in: 3600 });
+    }
+    if (url.includes("/queries/job_wind_1")) {
+      return jsonResponse(liveBqPayload(true));
+    }
+    if (url.includes("bigquery.googleapis.com") && url.endsWith("/queries")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        query?: string;
+        timeoutMs?: number;
+        maximumBytesBilled?: string;
+      };
+      assert.match(body.query ?? "", /INTERVAL 12 HOUR/);
+      assert.match(body.query ?? "", /ST_INTERSECTS\(t\.geography/);
+      assert.equal(body.timeoutMs, 12_000);
+      assert.equal(body.maximumBytesBilled, BQ_MAX_BYTES_BILLED);
+      return jsonResponse({ ...liveBqPayload(false), rows: undefined, schema: undefined });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const result = await fetchWindTicks(REGION, {
+    env: { GCP_SA_JSON: JSON.stringify(sa) },
+    fetch: doFetch,
+  });
+  assert.equal(result.usedFixture, false);
+  assert.equal(result.health.status, "ok");
+  assert.match(result.health.detail, /Experimental/);
+  assert.equal(result.wind[0]?.source, "WEATHERNEXT");
+  assert.equal(isLiveWeatherNextWind(result.wind[0]!), true);
+  assert.equal(windOverlayColor(result.wind[0]!), WIND_LIVE_COLOR);
+  assert.ok(calls.some((c) => c.startsWith("GET ") && c.includes("/queries/job_wind_1")));
+}
+
+async function bigQueryTimeoutFailsFastToFixture() {
+  resetGcpTokenCache();
+  const sa = await testServiceAccount();
+  const started = Date.now();
+  const doFetch: IngestFetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes("oauth2.googleapis.com")) {
+      return jsonResponse({ access_token: "ya29.timeout-token", expires_in: 3600 });
+    }
+    if (url.includes("bigquery.googleapis.com")) {
+      return jsonResponse({
+        jobComplete: false,
+        jobReference: {
+          projectId: "aegisflow-ieee-quest",
+          jobId: "job_slow",
+          location: "US",
+        },
+      });
+    }
+    throw new Error(`unexpected fetch ${url} ${init?.method ?? ""}`);
+  };
+
+  const result = await fetchWindTicks(REGION, {
+    env: { GCP_SA_JSON: JSON.stringify(sa) },
+    fetch: doFetch,
+  });
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 3_000, `timeout path hung the Worker (${elapsed}ms)`);
+  assert.equal(result.usedFixture, true);
+  assert.equal(result.health.status, "degraded");
+  assert.equal(result.health.detail, WIND_FALLBACK_DETAIL);
+  assert.doesNotMatch(result.health.detail, /BigQuery job did not complete within timeout/);
+  assert.doesNotMatch(result.health.detail, /timeout/i);
+  assert.equal(result.wind[0]?.source, "MOCK_WIND");
+  assert.equal(result.wind[0]?.degraded, true);
+  assert.equal(isLiveWeatherNextWind(result.wind[0]!), false);
+  assert.equal(windOverlayColor(result.wind[0]!), WIND_FALLBACK_COLOR);
+  assert.equal(publicWindBannerDetail("degraded", result.health.detail), "Wind · fallback");
+}
+
+async function runBigQuerySqlTimeoutThrowsCode() {
+  await assert.rejects(
+    () =>
+      runBigQuerySql(
+        "SELECT 1",
+        { projectId: "aegisflow-ieee-quest", location: "US" },
+        "ya29.test",
+        {
+          fetch: async () =>
+            jsonResponse({
+              jobComplete: false,
+              jobReference: { jobId: "job_x", location: "US" },
+            }),
+          budgetMs: 50,
+          jobWaitMs: 10,
+          maxPolls: 0,
+        },
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.equal(err.message, BQ_JOB_TIMEOUT_CODE);
+      return true;
+    },
+  );
+}
+
+function windBannerCopyNeverLeaksTimeout() {
+  assert.equal(
+    publicWindBannerDetail("degraded", "BigQuery job did not complete within timeout"),
+    WIND_FALLBACK_DETAIL,
+  );
+  assert.equal(
+    publicWindBannerDetail("degraded", "Query exceeded limit for bytes billed"),
+    WIND_FALLBACK_DETAIL,
+  );
+  assert.equal(publicWindBannerDetail("down", "forced wind adapter failure"), WIND_OFFLINE_DETAIL);
+  assert.match(
+    publicWindBannerDetail(
+      "ok",
+      "Experimental · weathernext_3_0_0_0p1deg · 8 10m cells · aegisflow-ieee-quest",
+    ),
+    /Experimental/,
+  );
+}
+
 async function loadIncidentFixtureFallback() {
   const saved = stashEnv();
   try {
@@ -351,7 +557,17 @@ function uiWiring() {
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /MapLegendStack/);
   assert.match(map, /isFirmsDemoFixture/);
+  assert.match(map, /windOverlayColor/);
+  assert.match(map, /isLiveWeatherNextWind/);
   assert.match(map, /#3DB9FF/);
+  const banner = readFileSync("src/components/ops/FeedBanner.tsx", "utf8");
+  assert.match(banner, /publicWindBannerDetail/);
+  assert.doesNotMatch(banner, /f\.label\}: \{f\.detail\}/);
+  const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
+  assert.match(top, /publicWindBannerDetail/);
+  assert.match(top, /OPS_REGION_OPTIONS/);
+  assert.match(top, /onRegionChange/);
+  assert.match(top, /FirmsVerifyButton/);
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   assert.match(stack, /ExperimentalBadge/);
   assert.match(stack, /SimBadge label="RF"/);
@@ -360,10 +576,6 @@ function uiWiring() {
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);
-  const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
-  assert.match(top, /OPS_REGION_OPTIONS/);
-  assert.match(top, /onRegionChange/);
-  assert.match(top, /FirmsVerifyButton/);
   const regions = readFileSync("src/lib/regions.ts", "utf8");
   assert.match(regions, /El Salvador \/ WUI/);
   assert.match(regions, /Cascade \(AegisFire-01\)/);
@@ -390,6 +602,10 @@ async function main() {
   await windForcedDown();
   await catalogAndSql();
   await jwtAndBigQueryHttp();
+  await bigQueryIncompleteThenPollSucceeds();
+  await bigQueryTimeoutFailsFastToFixture();
+  await runBigQuerySqlTimeoutThrowsCode();
+  windBannerCopyNeverLeaksTimeout();
   await loadIncidentFixtureFallback();
   await loadIncidentDegradedStaysUp();
   uiWiring();

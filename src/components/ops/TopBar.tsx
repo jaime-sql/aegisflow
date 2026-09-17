@@ -6,6 +6,7 @@ import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
 import { OPS_REGION_OPTIONS, resolveRegionId, type RegionId } from "@/lib/regions";
 import { feedDisplay, feedDotClass } from "@/lib/ui/status";
+import { publicWindBannerDetail } from "@/lib/ui/wind-feed";
 import { SimBadge } from "./SimBadge";
 import { FirmsVerifyButton } from "./FirmsVerifyButton";
 
@@ -65,7 +66,15 @@ export function TopBar({
             const feed = incident.feedHealth.feeds.find((f) => f.id === id);
             if (!feed) return null;
             return (
-              <span key={feed.id} title={feed.detail} className="flex items-center gap-1">
+              <span
+                key={feed.id}
+                title={
+                  feed.id === "wind"
+                    ? publicWindBannerDetail(feed.status, feed.detail)
+                    : feed.detail
+                }
+                className="flex items-center gap-1"
+              >
                 <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
                   {feed.label.replace("NASA ", "")}
                   <span className={`h-1.5 w-1.5 rounded-full ${feedDotClass(feed.status)}`} />

@@ -1,6 +1,10 @@
 import type { FeedComponent, WindTick } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
 import { remapLatLonToBbox } from "@/lib/regions";
+import {
+  WIND_FALLBACK_DETAIL,
+  WIND_OFFLINE_DETAIL,
+} from "@/lib/ui/wind-feed";
 import { runBigQuerySql } from "./bigquery";
 import { fetchGcpAccessToken, loadServiceAccountFromEnv } from "./gcp-auth";
 import type { IngestFetch, IngestEnv, IngestRegion } from "./types";
@@ -116,11 +120,7 @@ export async function fetchWindTicks(
       return {
         wind: fixture.map((w) => ({ ...w, degraded: true })),
         usedFixture: true,
-        health: weatherNextHealth(
-          "degraded",
-          "WeatherNext returned 0 cells — using fixture · Experimental",
-          now,
-        ),
+        health: weatherNextHealth("degraded", WIND_FALLBACK_DETAIL, now),
       };
     }
 
@@ -136,15 +136,12 @@ export async function fetchWindTicks(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown wind error";
+    console.warn("[weathernext]", message);
     if (env.AEGISFLOW_FAIL_WIND === "true") {
       return {
         wind: [],
         usedFixture: true,
-        health: weatherNextHealth(
-          "down",
-          `Wind adapter failed (${message}) — map continues without vectors`,
-          null,
-        ),
+        health: weatherNextHealth("down", WIND_OFFLINE_DETAIL, null),
       };
     }
     return {
@@ -152,7 +149,7 @@ export async function fetchWindTicks(
       usedFixture: true,
       health: weatherNextHealth(
         "degraded",
-        `WeatherNext pull failed (${message}) — fixture in use · Experimental`,
+        WIND_FALLBACK_DETAIL,
         fixture[0]?.observedAt ?? null,
       ),
     };

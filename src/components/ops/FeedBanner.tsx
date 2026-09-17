@@ -1,5 +1,6 @@
 import type { FeedHealth } from "@/lib/schema";
 import { feedDisplay, feedTextClass } from "@/lib/ui/status";
+import { publicWindBannerDetail } from "@/lib/ui/wind-feed";
 
 export function FeedBanner({ health }: { health: FeedHealth }) {
   const bad = health.feeds.filter((f) => f.status !== "ok");
@@ -15,7 +16,9 @@ export function FeedBanner({ health }: { health: FeedHealth }) {
           <li key={f.id}>
             <span className={feedTextClass(f.status)}>{feedDisplay(f.status)}</span>
             {" · "}
-            {f.label}: {f.detail}
+            {f.id === "wind"
+              ? publicWindBannerDetail(f.status, f.detail)
+              : `${f.label}: ${f.detail}`}
           </li>
         ))}
       </ul>
