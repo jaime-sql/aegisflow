@@ -148,6 +148,10 @@ async function windSqlUsesSelectedBbox() {
   const sqlEs = buildWeatherNextWindSql(EL_SALVADOR_BBOX, table);
   assert.match(sqlEs, /POLYGON\(\(-90\.2000 13\.1000/);
   assert.match(sqlEs, /-87\.6500 14\.4800/);
+  assert.match(sqlEs, /INTERVAL 12 HOUR/);
+  assert.match(sqlEs, /f\.hours BETWEEN 1 AND 6/);
+  assert.match(sqlEs, /LIMIT 24/);
+  assert.doesNotMatch(sqlEs, /INTERVAL 48 HOUR/);
 
   const sqlCascade = buildWeatherNextWindSql(CASCADE_BBOX, table);
   assert.match(sqlCascade, /POLYGON\(\(-121\.9200 44\.1200/);

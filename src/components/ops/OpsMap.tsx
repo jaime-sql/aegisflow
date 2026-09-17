@@ -7,6 +7,10 @@ import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
 import { PUBLIC_CROWD_COPY } from "@/lib/pii";
 import { withBasePath } from "@/lib/base-path";
 import { isFirmsDemoFixture, hotspotPopupHtml } from "@/lib/ui/firms-demo";
+import {
+  isLiveWeatherNextWind,
+  windOverlayColor,
+} from "@/lib/ui/wind-feed";
 import { MapLegendStack } from "./MapLegendStack";
 
 const leafletIconPath = withBasePath("/leaflet");
@@ -43,26 +47,28 @@ function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
 
   for (const w of incident.wind) {
     const dest = windDest(w);
+    const color = windOverlayColor(w);
+    const live = isLiveWeatherNextWind(w);
     L.polyline(
       [
         [w.lat, w.lon],
         dest,
       ],
       {
-        color: "#3DB9FF",
+        color,
         weight: 2,
-        opacity: 0.9,
+        opacity: live ? 0.9 : 0.7,
       },
     ).addTo(group);
     L.circleMarker(dest, {
       radius: 3,
-      color: "#3DB9FF",
-      fillColor: "#3DB9FF",
+      color,
+      fillColor: color,
       fillOpacity: 1,
       weight: 0,
     })
       .bindPopup(
-        `<div style="font-family:ui-monospace,monospace">${w.source === "WEATHERNEXT" ? "WeatherNext · Experimental<br/>" : ""}${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
+        `<div style="font-family:ui-monospace,monospace">${live ? "WeatherNext · Experimental<br/>" : ""}${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
       )
       .addTo(group);
   }
@@ -191,7 +197,17 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
             <span className="h-2.5 w-2.5 rounded-full bg-[#FF4D2E]" /> Hotspot
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-0.5 w-4 bg-[#3DB9FF]" /> Wind overlay
+            <span
+              className="h-0.5 w-4"
+              style={{
+                backgroundColor: incident.wind.some((w) =>
+                  isLiveWeatherNextWind(w),
+                )
+                  ? "#3DB9FF"
+                  : "#8B9BB8",
+              }}
+            />{" "}
+            Wind overlay
           </div>
           {incident.region.id === "cascade" && (
             <div className="flex items-center gap-2">
