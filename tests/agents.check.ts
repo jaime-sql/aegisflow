@@ -356,6 +356,8 @@ function uiWiring() {
   const badge = readFileSync("src/components/ops/SimBadge.tsx", "utf8");
   assert.match(badge, /SIM/);
   assert.match(badge, /#3DB9FF/);
+  assert.match(badge, /label\?:/);
+  assert.equal((badge.match(/\breturn\b/g) ?? []).length, 1);
   const status = readFileSync("src/lib/ui/status.ts", "utf8");
   assert.match(status, /agentIsSim/);
   const drawer = readFileSync("src/components/ops/LineageDrawer.tsx", "utf8");
