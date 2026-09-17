@@ -565,9 +565,13 @@ function uiWiring() {
   assert.doesNotMatch(banner, /f\.label\}: \{f\.detail\}/);
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /publicWindBannerDetail/);
-  assert.match(top, /OPS_REGION_OPTIONS/);
-  assert.match(top, /onRegionChange/);
   assert.match(top, /FirmsVerifyButton/);
+  assert.doesNotMatch(top, /disabled=/);
+  assert.doesNotMatch(top, /onRegionChange/);
+  const picker = readFileSync("src/components/ops/RegionPicker.tsx", "utf8");
+  assert.match(picker, /OPS_REGION_OPTIONS/);
+  assert.match(picker, /method="get"/);
+  assert.match(picker, /onchange="this\.form\.submit\(\)"/);
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   assert.match(stack, /ExperimentalBadge/);
   assert.match(stack, /SimBadge label="RF"/);

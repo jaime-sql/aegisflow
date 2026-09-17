@@ -180,19 +180,40 @@ async function loadIncidentViaApiRegionParam() {
 
 function uiWiring() {
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
-  assert.match(top, /OPS_REGION_OPTIONS/);
-  assert.match(top, /onRegionChange/);
   assert.match(top, /FirmsVerifyButton/);
-  assert.doesNotMatch(top, /defaultValue=\{incident\.incidentId\}/);
+  assert.match(top, /regionPicker/);
+  assert.doesNotMatch(top, /disabled=/);
+  assert.doesNotMatch(top, /disabled=\{/);
+  assert.doesNotMatch(top, /preventDefault/);
+  assert.doesNotMatch(top, /onRegionChange/);
+  assert.doesNotMatch(top, /action="\/ops"/);
+
+  const picker = readFileSync("src/components/ops/RegionPicker.tsx", "utf8");
+  assert.match(picker, /OPS_REGION_OPTIONS/);
+  assert.match(picker, /method="get"/);
+  assert.match(picker, /name="region"/);
+  assert.match(picker, /withBasePath\("\/ops"\)/);
+  assert.match(picker, /cursor-pointer/);
+  assert.match(picker, /onchange="this\.form\.submit\(\)"/);
+  assert.doesNotMatch(picker, /disabled=/);
+  assert.doesNotMatch(picker, /preventDefault/);
+  assert.doesNotMatch(picker, /"use client"/);
   const regionsSrc = readFileSync("src/lib/regions.ts", "utf8");
   assert.match(regionsSrc, /El Salvador \/ WUI/);
   assert.match(regionsSrc, /Cascade \(AegisFire-01\)/);
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
-  assert.match(shell, /\/api\/ops\/incident\?region=/);
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);
-  assert.match(shell, /setIncident/);
+  assert.match(shell, /regionPicker/);
+  assert.doesNotMatch(shell, /onRegionChange/);
+  assert.doesNotMatch(shell, /setSwitching/);
+  assert.doesNotMatch(shell, /router\.push/);
+  assert.doesNotMatch(shell, /router\.replace/);
+
+  const page = readFileSync("src/app/ops/page.tsx", "utf8");
+  assert.match(page, /RegionPicker/);
+  assert.match(page, /params\.region/);
 
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /drawIncidentLayers/);
@@ -211,6 +232,9 @@ function uiWiring() {
   const docs = readFileSync("docs/regions.md", "utf8");
   assert.match(docs, /-90\.20, 13\.10, -87\.65, 14\.48/);
   assert.match(docs, /el-salvador/);
+  assert.match(docs, /never `disabled`/);
+  assert.match(docs, /GET form/);
+  assert.match(docs, /one shot/);
 }
 
 async function main() {

@@ -124,6 +124,7 @@ function uiWiring() {
   const button = readFileSync("src/components/ops/FirmsVerifyButton.tsx", "utf8");
   assert.match(button, /"Verify"/);
   assert.match(button, /\/api\/ops\/firms-verify\?region=/);
+  assert.match(button, /absoluteAppUrl/);
   assert.match(button, /aria-label="Verify FIRMS"/);
   assert.match(button, /role="status"/);
   assert.doesNotMatch(button, /setIncident/);
@@ -141,7 +142,7 @@ function uiWiring() {
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.doesNotMatch(shell, /firms-verify/);
-  assert.match(shell, /\/api\/ops\/incident\?region=/);
+  assert.doesNotMatch(shell, /onRegionChange/);
 }
 
 async function main() {

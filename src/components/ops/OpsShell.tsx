@@ -1,11 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { IncidentEvent } from "@/lib/schema";
-import { parseIncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
-import type { RegionId } from "@/lib/regions";
 import { isFeedUnhealthy } from "@/lib/ui/status";
 import { withBasePath } from "@/lib/base-path";
 import { TopBar } from "./TopBar";
@@ -23,39 +22,19 @@ const OpsMap = dynamic(() => import("./OpsMap").then((m) => m.OpsMap), {
 });
 
 export function OpsShell({
-  incident: initialIncident,
+  incident,
   session,
+  regionPicker,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
+  regionPicker: ReactNode;
 }) {
-  const [incident, setIncident] = useState(initialIncident);
-  const [switching, setSwitching] = useState(false);
   const [lineageId, setLineageId] = useState<string | null>(null);
   const selected = useMemo(
     () => incident.agents.find((a) => a.eventId === lineageId) ?? null,
     [incident.agents, lineageId],
   );
-
-  async function onRegionChange(regionId: RegionId) {
-    if (regionId === incident.region.id || switching) return;
-    setSwitching(true);
-    try {
-      const res = await fetch(
-        withBasePath(`/api/ops/incident?region=${encodeURIComponent(regionId)}`),
-        { cache: "no-store" },
-      );
-      if (!res.ok) {
-        throw new Error(`incident HTTP ${res.status}`);
-      }
-      const next = parseIncidentEvent(await res.json());
-      setIncident(next);
-    } catch {
-      // Keep the current snapshot so Ops never blanks on a failed remap.
-    } finally {
-      setSwitching(false);
-    }
-  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#0B1220] text-[#E8EEF9]">
@@ -68,12 +47,7 @@ export function OpsShell({
           </span>
         </div>
       )}
-      <TopBar
-        incident={incident}
-        session={session}
-        switching={switching}
-        onRegionChange={onRegionChange}
-      />
+      <TopBar incident={incident} session={session} regionPicker={regionPicker} />
       <div className="relative grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65%)_minmax(340px,35%)]">
         <main className="relative min-h-[45vh]">
           <OpsMap incident={incident} />

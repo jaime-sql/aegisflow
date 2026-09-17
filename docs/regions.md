@@ -51,3 +51,15 @@ GET /api/ops/incident?region=cascade
 ```
 
 Unknown `region` values fall back to El Salvador / WUI.
+
+## Live Worker picker (Design + QA)
+
+Acceptance on workers.dev and cortexmatter (`basePath` `/aegisflow`):
+
+- The region control stays **clickable** (never `disabled` / greyed).
+- El Salvador → Cascade remaps **map + FIRMS + wind + chips in one shot** (and back).
+- Click-with-no-remap is a bug.
+
+The TopBar control is a **GET form** to `{basePath}/ops?region=`. A native HTML `onchange` is baked into the server HTML so OpenNext does not depend on a client `fetch` that can 404, hang (and grey the select), or swallow errors. The Ops page already loads FIRMS + wind from `searchParams.region`. Form `action` uses `withBasePath("/ops")` so navigation stays under `/aegisflow` (never apex `/` or unprefixed `/ops`).
+
+`withBasePath()` still reads `process.env.NEXT_PUBLIC_BASE_PATH` as a direct member expression (Next.js does not inline `process.env` as an object in the browser) and infers `/aegisflow` from the current pathname.

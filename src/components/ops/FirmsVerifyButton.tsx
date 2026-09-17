@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { RegionId } from "@/lib/regions";
-import { withBasePath } from "@/lib/base-path";
+import { absoluteAppUrl } from "@/lib/base-path";
 
 type ProbeJson = {
   live: boolean;
@@ -31,8 +31,10 @@ export function FirmsVerifyButton({
     setBusy(true);
     try {
       const res = await fetch(
-        withBasePath(`/api/ops/firms-verify?region=${encodeURIComponent(regionId)}`),
-        { cache: "no-store" },
+        absoluteAppUrl(
+          `/api/ops/firms-verify?region=${encodeURIComponent(regionId)}`,
+        ),
+        { cache: "no-store", credentials: "same-origin" },
       );
       if (!res.ok) {
         throw new Error(`verify HTTP ${res.status}`);
