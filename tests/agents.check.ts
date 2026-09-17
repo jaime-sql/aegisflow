@@ -5,7 +5,7 @@ import { runAllAgents, runFirePropagation } from "../src/lib/agents";
 import { agentEventId } from "../src/lib/agents/ids";
 import { loadOpsIncident } from "../src/lib/incident/load";
 import { parseIncidentEvent } from "../src/lib/schema/zod";
-import { agentStatusLabel } from "../src/lib/ui/status";
+import { agentIsSim } from "../src/lib/ui/status";
 import type { IngestFetch } from "../src/lib/ingest/types";
 import type { AgentRunInput } from "../src/lib/agents/types";
 import type { Hotspot, WindTick } from "../src/lib/schema";
@@ -127,7 +127,7 @@ async function fixtureWithoutKeys() {
     assert.equal(agent.model.runtime, "local");
     assert.equal(agent.degraded, undefined);
     assert.ok(agent.confidence >= 0.7);
-    assert.equal(agentStatusLabel(agent), "Fixture");
+    assert.equal(agentIsSim(agent), true);
     assert.equal(agent.incidentId, "SV-WUI");
     assert.match(agent.eventId, /^evt_svwui_agent_/);
     const hotspotIds = agent.lineage.filter((l) => l.kind === "hotspot").map((l) => l.eventId);
@@ -202,7 +202,7 @@ async function openaiLive() {
   assert.equal(result.agents[0]?.model.used, "openai");
   assert.equal(result.agents[0]?.model.runtime, "local");
   assert.equal(result.agents[0]?.degraded, undefined);
-  assert.equal(agentStatusLabel(result.agents[0]!), "Live");
+  assert.equal(agentIsSim(result.agents[0]!), false);
   assert.match(result.agents[0]!.summary, /Live propagation/);
   assert.equal(result.agents[0]!.eventId, "evt_svwui_agent_propagation");
   assert.ok(urls.some((u) => u.includes("api.openai.com")));
@@ -226,7 +226,7 @@ async function deepseekFallback() {
     fetch: doFetch,
   });
   assert.equal(result.agents[0]?.model.used, "deepseek");
-  assert.equal(agentStatusLabel(result.agents[0]!), "Live");
+  assert.equal(agentIsSim(result.agents[0]!), false);
   assert.ok(urls.some((u) => u.includes("openai.com")));
   assert.ok(urls.some((u) => u.includes("api.deepseek.com")));
 }
@@ -289,7 +289,7 @@ async function modalFailUsesFixtureHonestly() {
     assert.equal(agent.model.used, "fixture");
     assert.equal(agent.degraded, true);
     assert.ok(agent.confidence <= 0.4);
-    assert.equal(agentStatusLabel(agent), "Degraded");
+    assert.equal(agentIsSim(agent), true);
     assert.ok(agent.recommendations.length >= 1);
   }
 }
@@ -329,7 +329,7 @@ async function loadIncidentFixtureAgents() {
     }
     const feed = incident.feedHealth.feeds.find((f) => f.id === "agents");
     assert.equal(feed?.status, "ok");
-    assert.equal(agentStatusLabel(incident.agents[0]!), "Fixture");
+    assert.equal(agentIsSim(incident.agents[0]!), true);
   } finally {
     restoreEnv(saved);
   }
@@ -348,19 +348,28 @@ async function ackAssignStillBound() {
 
 function uiWiring() {
   const chip = readFileSync("src/components/ops/AgentChip.tsx", "utf8");
-  assert.match(chip, /agentStatusLabel/);
-  assert.match(chip, /agent\.model\.used/);
+  assert.match(chip, /agentIsSim/);
+  assert.match(chip, /SimBadge/);
+  assert.match(chip, /conf \{agent\.confidence/);
+  assert.doesNotMatch(chip, /model\.used/);
+  assert.doesNotMatch(chip, /Fixture|Degraded|Live openai/);
+  const badge = readFileSync("src/components/ops/SimBadge.tsx", "utf8");
+  assert.match(badge, /SIM/);
+  assert.match(badge, /#3DB9FF/);
   const status = readFileSync("src/lib/ui/status.ts", "utf8");
-  assert.match(status, /Fixture/);
-  assert.match(status, /Degraded/);
+  assert.match(status, /agentIsSim/);
   const drawer = readFileSync("src/components/ops/LineageDrawer.tsx", "utf8");
   assert.match(drawer, /same NASA FIRMS hotspot/);
-  assert.match(drawer, /degraded/);
+  assert.match(drawer, /SimBadge/);
   const dispatch = readFileSync("src/components/ops/DispatchList.tsx", "utf8");
   assert.match(dispatch, /Ack/);
   assert.match(dispatch, /Assign/);
   const rail = readFileSync("src/components/ops/RightRail.tsx", "utf8");
-  assert.match(rail, /agent\.recommendations/);
+  const execAt = rail.indexOf("<ExecSummaryCard");
+  const agentsAt = rail.indexOf("Agents");
+  const dispatchAt = rail.indexOf("<DispatchList");
+  assert.ok(execAt >= 0 && agentsAt > execAt && dispatchAt > agentsAt);
+  assert.doesNotMatch(rail, /Agent status|Agent runtime|fourth/i);
   const worker = readFileSync("workers/modal_stub.py", "utf8");
   assert.match(worker, /fastapi_endpoint/);
   assert.match(worker, /requires_proxy_auth/);
@@ -372,6 +381,7 @@ function uiWiring() {
   const docs = readFileSync("docs/agents.md", "utf8");
   assert.match(docs, /What Jaime must set/);
   assert.match(docs, /OPENAI_API_KEY/);
+  assert.match(docs, /SimBadge|SIM/);
   const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
   assert.match(workflow, /OPENAI_API_KEY/);
   assert.match(workflow, /DEEPSEEK_API_KEY/);

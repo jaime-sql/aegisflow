@@ -28,11 +28,15 @@ Matches the Stage 1 stub and the schema literals:
 
 ## Honest status (no silent fake confidence)
 
-| Situation | `model.used` | `degraded` | confidence | Feed health |
+Right rail stays **exec summary → agent chips → dispatch**. No extra agent panel.
+
+Live Modal/LLM success only refreshes **chip confidence** and the **lineage drawer** (model, sources, timestamps). Stub fallback (missing keys **or** live failure) marks that chip **SIM** with the same [`SimBadge`](../src/components/ops/SimBadge.tsx) used for RF / Edge — not a fourth rail section.
+
+| Situation | `model.used` | `degraded` | confidence | Chip |
 | --- | --- | --- | --- | --- |
-| No keys / no Modal | `fixture` | omitted | fixture values (0.71–0.82) | `ok` — AgentChip shows **Fixture** |
-| Live Modal or LLM success | `openai` or `deepseek` | omitted | model value (capped at 0.95) | `ok` — AgentChip shows **Live** |
-| Live attempt failed | `fixture` | `true` | **capped at 0.40** | `degraded` — FeedBanner + AgentChip **Degraded** |
+| No keys / no Modal | `fixture` | omitted | fixture values (0.71–0.82) | **SIM** + conf |
+| Live Modal or LLM success | `openai` or `deepseek` | omitted | model value (capped at 0.95) | conf only |
+| Live attempt failed | `fixture` | `true` | **capped at 0.40** | **SIM** + capped conf; agents feed `degraded` (map FeedBanner, not a new rail) |
 
 Ops never blanks. Manager Ack/Assign still bind to `agent.recommendations[].actionId`.
 
@@ -95,6 +99,6 @@ Jaime adds GitHub Actions secrets (agents often **cannot**):
 | `MODAL_ENDPOINT` | Actions variable **or** Wrangler var (the `*.modal.run` URL) |
 | `DEEPSEEK_BASE_URL` | Wrangler var (already defaulted) |
 
-Empty values keep Ops on the fixture path (same pattern as FIRMS / WeatherNext). After a Cloudflare Prod run, AgentChip should read **Live openai** (or **Live deepseek**) when keys work; otherwise **Fixture** or **Degraded** with a FeedBanner.
+Empty values keep Ops on the fixture path (same pattern as FIRMS / WeatherNext). After a Cloudflare Prod run, live chips show **confidence only**; stub chips show the **SIM** mark (RF/Edge token). Ops never blanks.
 
 Do **not** change Clerk or the Fabric stub in this phase.

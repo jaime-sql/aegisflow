@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { AgentOutput } from "@/lib/schema";
 import type { OpsRole } from "@/lib/auth/roles";
-import { agentShortName, agentStatusClass, agentStatusLabel } from "@/lib/ui/status";
+import { agentIsSim, agentShortName } from "@/lib/ui/status";
+import { SimBadge } from "./SimBadge";
 
 export function LineageDrawer({
   agent,
@@ -14,11 +15,13 @@ export function LineageDrawer({
   role: OpsRole;
   onClose: () => void;
 }) {
+  const stub = agentIsSim(agent);
   return (
     <aside className="absolute inset-y-0 right-0 z-[600] flex w-[400px] max-w-full flex-col border-l border-[#1E2A40] bg-[#121A2B] shadow-2xl">
       <div className="flex items-center justify-between border-b border-[#1E2A40] px-4 py-3">
-        <h2 className="text-sm font-semibold">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
           Lineage — Agent · {agentShortName(agent.agentId)}
+          {stub ? <SimBadge /> : null}
         </h2>
         <button
           type="button"
@@ -34,17 +37,6 @@ export function LineageDrawer({
           Lineage cites the same NASA FIRMS hotspot and WeatherNext wind eventIds
           the map is plotting (Experimental wind).
         </p>
-        {agent.degraded ? (
-          <p className="rounded border border-[#FF5C5C]/40 bg-[#FF5C5C]/10 px-2 py-1 text-[11px] text-[#FF5C5C]">
-            Live Modal/LLM failed — fixture text in use. Confidence is capped so
-            this is not a silent live score.
-          </p>
-        ) : null}
-        {agent.model.used === "fixture" && !agent.degraded ? (
-          <p className="rounded border border-[#FFB020]/40 bg-[#FFB020]/10 px-2 py-1 text-[11px] text-[#FFB020]">
-            Fixture agent — no OPENAI_API_KEY / DEEPSEEK_API_KEY / MODAL_ENDPOINT.
-          </p>
-        ) : null}
         <div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
             Inputs
@@ -65,9 +57,11 @@ export function LineageDrawer({
           <p className="mt-1">
             OpenAI (primary) / DeepSeek (backup) · used {agent.model.used} ·{" "}
             {agent.model.runtime}
+            {stub ? " · stub" : ""}
           </p>
-          <p className={`mt-1 font-mono text-[11px] ${agentStatusClass(agentStatusLabel(agent))}`}>
-            {agentStatusLabel(agent)} · {agent.producedAt.replace(".000Z", "Z")}
+          <p className="mt-1 font-mono text-[11px] text-[#8B9BB8]">
+            {agent.producedAt.replace(".000Z", "Z")}
+            {agent.degraded ? " · live call failed, stub in use" : ""}
           </p>
         </div>
         <div>
@@ -75,7 +69,7 @@ export function LineageDrawer({
             Output
           </div>
           <p className="mt-1 font-mono text-[11px]">
-            {agent.outputHash} · {agent.producedAt.replace(".000Z", "Z")}
+            {agent.outputHash} · conf {agent.confidence.toFixed(2)}
           </p>
           <p className="mt-2 leading-relaxed text-[#8B9BB8]">{agent.summary}</p>
         </div>

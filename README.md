@@ -15,7 +15,7 @@ Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citi
 | --- | --- |
 | Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. |
 | Ingest | NASA **FIRMS** hotspots (live or fixture) + **WeatherNext** 10 m wind (BigQuery, Experimental; fixture fallback). One feed can fail without blanking Ops. |
-| Agents | Fire propagation · Evacuation logistics · Resource allocation. **OpenAI** primary / **DeepSeek** backup, hosted on **Modal** when `MODAL_ENDPOINT` is set. Missing keys → fixture (AgentChip shows **Fixture**, not silent live confidence). |
+| Agents | Fire propagation · Evacuation logistics · Resource allocation. **OpenAI** primary / **DeepSeek** backup, hosted on **Modal** when `MODAL_ENDPOINT` is set. Stub fallback marks the existing AgentChip **SIM** (same token as RF / Edge). Live runs only refresh chip confidence + lineage drawer. |
 | Runtime | Modal worker (`workers/modal_stub.py`) — `python3 workers/modal_stub.py` locally; `modal deploy` for live HTTP. |
 | UI | **One** Next.js Ops dashboard (dark ops). Map ~60–70% width. No Replit second map. No live Fabric map. |
 | IDs | Shared `eventId` + `schemaVersion` for Ops **and** a future Fabric twin. See [`docs/event-schema.md`](docs/event-schema.md). |
@@ -160,7 +160,7 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - Optional live ingest (otherwise Ops uses the AegisFire-01 fixture and FeedBanner stays quiet):
      - `FIRMS_MAP_KEY` — NASA FIRMS MAP key. Also uploaded as Wrangler secret `FIRMS_MAP_KEY` on Worker `aegisflow`.
      - `GCP_SA_JSON` — service-account JSON for GCP project `aegisflow-ieee-quest` (BigQuery Job User + Data Viewer on the WeatherNext Analytics Hub dataset). Wrangler secret `GCP_SA_JSON`.
-   - Optional live agents (otherwise AgentChip shows **Fixture**; Ops stays up). See [`docs/agents.md`](docs/agents.md):
+   - Optional live agents (otherwise AgentChip shows **SIM** like RF/Edge; Ops stays up). See [`docs/agents.md`](docs/agents.md):
      - `OPENAI_API_KEY` — primary LLM. Wrangler secret.
      - `DEEPSEEK_API_KEY` — cheaper backup LLM. Wrangler secret.
      - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var.

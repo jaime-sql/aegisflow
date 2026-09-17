@@ -31,19 +31,10 @@ export function agentShortName(agentId: string): string {
   return agentId;
 }
 
-export type AgentStatusLabel = "Live" | "Fixture" | "Degraded";
-
-export function agentStatusLabel(agent: {
+/** Stub / fixture fallback — mark the chip SIM like RF / Edge. */
+export function agentIsSim(agent: {
   degraded?: boolean;
   model: { used: string };
-}): AgentStatusLabel {
-  if (agent.degraded) return "Degraded";
-  if (agent.model.used === "fixture") return "Fixture";
-  return "Live";
-}
-
-export function agentStatusClass(label: AgentStatusLabel): string {
-  if (label === "Live") return "text-[#3DDC97]";
-  if (label === "Degraded") return "text-[#FF5C5C]";
-  return "text-[#FFB020]";
+}): boolean {
+  return agent.model.used === "fixture" || Boolean(agent.degraded);
 }
