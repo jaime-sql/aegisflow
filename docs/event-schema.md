@@ -10,15 +10,19 @@ Canonical types live in [`src/lib/schema/zod.ts`](../src/lib/schema/zod.ts). JSO
 | --- | --- |
 | `eventId` | **Primary join key.** Format `evt_<incidentToken>_<kind>_<n>`. Never recycled. Ops panels, timeline rows, agent lineage, and Fabric stubs all render this string. |
 | `schemaVersion` | Currently `1.0.0`. Both surfaces must reject or migrate unknown versions. |
-| `incidentId` | Human incident name, e.g. `AegisFire-01`. Many events share one incident. |
+| `incidentId` | Human incident name, e.g. `SV-WUI` (default) or `AegisFire-01`. Many events share one incident. |
+| `region.id` | Ops picker: `el-salvador` (default) or `cascade`. Same map remaps in place. |
 
-Sample envelope for this repo:
+Sample envelope for this repo (Cascade fixture file):
 
 ```
 eventId:      evt_aegisfire01_incident
 incidentId:   AegisFire-01
+region.id:    cascade
 schemaVersion: 1.0.0
 ```
+
+Default Ops load uses El Salvador / WUI (`evt_svwui_incident` / `SV-WUI`). See [`docs/regions.md`](regions.md).
 
 Hotspots, wind ticks, agent outputs, feed-health snapshots, and timeline items each have their **own** `eventId`. Agent lineage arrays point at those IDs (FIRMS hotspot events, WeatherNext wind ticks, SOP notes) so a judge can walk a recommendation back to evidence.
 

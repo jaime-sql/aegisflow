@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 export default async function OpsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string }>;
+  searchParams: Promise<{ role?: string; region?: string }>;
 }) {
   const params = await searchParams;
   const [incident, session] = await Promise.all([
-    loadOpsIncident(),
+    loadOpsIncident(params.region),
     getOpsSession(params.role),
   ]);
 

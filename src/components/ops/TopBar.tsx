@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
+import { OPS_REGION_OPTIONS, resolveRegionId, type RegionId } from "@/lib/regions";
 import { feedDisplay, feedDotClass } from "@/lib/ui/status";
 import { SimBadge } from "./SimBadge";
 
@@ -17,10 +18,16 @@ const PRIMARY_FEEDS = ["firms", "wind", "crowd"] as const;
 export function TopBar({
   incident,
   session,
+  switching = false,
+  onRegionChange,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
+  switching?: boolean;
+  onRegionChange?: (regionId: RegionId) => void;
 }) {
+  const regionId = resolveRegionId(incident.region.id);
+
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#1E2A40] bg-[#0B1220] px-3">
       <div className="flex items-center gap-2">
@@ -33,13 +40,21 @@ export function TopBar({
       <div className="hidden h-6 w-px bg-[#1E2A40] sm:block" />
 
       <label className="flex min-w-0 items-center gap-1.5">
-        <span className="sr-only">Incident</span>
+        <span className="sr-only">Region</span>
         <select
-          className="max-w-[220px] truncate rounded border border-[#1E2A40] bg-[#121A2B] px-2 py-1 text-sm text-[#E8EEF9]"
-          defaultValue={incident.incidentId}
-          aria-label="Incident"
+          className="max-w-[260px] truncate rounded border border-[#1E2A40] bg-[#121A2B] px-2 py-1 text-sm text-[#E8EEF9]"
+          value={regionId}
+          aria-label="Region"
+          aria-busy={switching}
+          onChange={(event) => {
+            onRegionChange?.(resolveRegionId(event.target.value));
+          }}
         >
-          <option value={incident.incidentId}>{incident.incidentId}</option>
+          {OPS_REGION_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
 

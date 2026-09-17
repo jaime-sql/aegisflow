@@ -1,7 +1,10 @@
 import { fetchFirmsHotspots } from "@/lib/ingest/firms";
+import type { FirmsFetchDeps } from "@/lib/ingest/firms";
 import { fetchWindTicks } from "@/lib/ingest/wind";
+import type { WindFetchDeps } from "@/lib/ingest/wind";
 import { runAllAgents } from "@/lib/agents";
 import { cloneFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import { resolveOpsRegion } from "@/lib/regions";
 import type { FeedHealth, IncidentEvent } from "@/lib/schema";
 import { SCHEMA_VERSION } from "@/lib/schema";
 import { SAMPLE_CROWD_REPORT, PUBLIC_CROWD_COPY, scrubPii } from "@/lib/pii";
@@ -23,17 +26,31 @@ function rollup(
   };
 }
 
-export async function loadOpsIncident(): Promise<IncidentEvent> {
+export type LoadOpsIncidentDeps = {
+  firms?: FirmsFetchDeps;
+  wind?: WindFetchDeps;
+};
+
+/**
+ * Fuse FIRMS + WeatherNext for the selected Ops region.
+ * Default region is El Salvador / WUI; pass `cascade` for AegisFire-01.
+ */
+export async function loadOpsIncident(
+  regionId?: string | null,
+  deps: LoadOpsIncidentDeps = {},
+): Promise<IncidentEvent> {
+  const region = resolveOpsRegion(regionId);
   const base = cloneFixtureIncident();
   const crowd = scrubPii(SAMPLE_CROWD_REPORT);
+  const ingestRegion = { bbox: region.bbox, center: region.center };
 
   const [firms, wind] = await Promise.all([
-    fetchFirmsHotspots(base.region.bbox),
-    fetchWindTicks({ bbox: base.region.bbox, center: base.region.center }),
+    fetchFirmsHotspots(region.bbox, deps.firms),
+    fetchWindTicks(ingestRegion, deps.wind),
   ]);
 
   const agents = await runAllAgents({
-    incidentId: base.incidentId,
+    incidentId: region.incidentId,
     hotspots: firms.hotspots,
     wind: wind.wind,
   });
@@ -50,10 +67,20 @@ export async function loadOpsIncident(): Promise<IncidentEvent> {
 
   const incident: IncidentEvent = {
     ...base,
+    eventId: region.incidentEventId,
+    incidentId: region.incidentId,
+    name: region.incidentName,
+    region: {
+      id: region.id,
+      name: region.name,
+      placeholder: region.placeholder,
+      center: region.center,
+      bbox: region.bbox,
+    },
+    executiveSummary: region.executiveSummary,
     hotspots: firms.hotspots,
     wind: wind.wind,
     agents: agents.agents.length ? agents.agents : base.agents,
-    executiveSummary: base.executiveSummary,
     feedHealth: rollup(base, [
       firms.health,
       wind.health,

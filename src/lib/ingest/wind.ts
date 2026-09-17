@@ -1,5 +1,6 @@
 import type { FeedComponent, WindTick } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import { remapLatLonToBbox } from "@/lib/regions";
 import { runBigQuerySql } from "./bigquery";
 import { fetchGcpAccessToken, loadServiceAccountFromEnv } from "./gcp-auth";
 import type { IngestFetch, IngestEnv, IngestRegion } from "./types";
@@ -24,8 +25,8 @@ export type WindFetchDeps = {
   env?: IngestEnv;
 };
 
-function fixtureWind(): WindTick[] {
-  return loadFixtureIncident().wind;
+function fixtureWind(region: IngestRegion): WindTick[] {
+  return remapLatLonToBbox(loadFixtureIncident().wind, region.bbox);
 }
 
 function weatherNextHealth(
@@ -84,7 +85,7 @@ export async function fetchWindTicks(
 ): Promise<WindResult> {
   const now = new Date().toISOString();
   const env = deps.env ?? process.env;
-  const fixture = fixtureWind();
+  const fixture = fixtureWind(region);
 
   try {
     if (env.AEGISFLOW_FAIL_WIND === "true") {

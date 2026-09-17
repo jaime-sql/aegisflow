@@ -35,12 +35,17 @@ export const incidentJsonSchema = {
     status: { enum: ["active", "contained", "patrol"] },
     region: {
       type: "object",
-      required: ["name", "placeholder", "center", "bbox"],
+      required: ["id", "name", "placeholder", "center", "bbox"],
       properties: {
+        id: {
+          enum: ["el-salvador", "cascade"],
+          description:
+            "Ops region picker. Default is el-salvador; cascade is AegisFire-01.",
+        },
         name: { type: "string" },
         placeholder: {
           type: "boolean",
-          description: "True until Jaime locks the demo region.",
+          description: "True for the Cascade AegisFire-01 demo incident.",
         },
         center: {
           type: "object",
