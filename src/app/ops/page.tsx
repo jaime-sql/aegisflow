@@ -1,4 +1,5 @@
 import { OpsShell } from "@/components/ops/OpsShell";
+import { RegionPicker } from "@/components/ops/RegionPicker";
 import { getOpsSession } from "@/lib/auth/session";
 import { loadOpsIncident } from "@/lib/incident/load";
 
@@ -15,5 +16,11 @@ export default async function OpsPage({
     getOpsSession(params.role),
   ]);
 
-  return <OpsShell incident={incident} session={session} />;
+  return (
+    <OpsShell
+      incident={incident}
+      session={session}
+      regionPicker={<RegionPicker regionId={incident.region.id} />}
+    />
+  );
 }
