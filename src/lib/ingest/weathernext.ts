@@ -86,6 +86,14 @@ export function resolveWeatherNextTable(
   };
 }
 
+/** Worker-safe Ops snapshot: latest partition, active bbox, few lead hours. */
+export const WEATHERNEXT_OPS_QUERY = {
+  initLookbackHours: 12,
+  leadHourMin: 1,
+  leadHourMax: 6,
+  cellLimit: 24,
+} as const;
+
 export function bboxPolygonWkt(bbox: BBox): string {
   const [west, south, east, north] = bbox;
   for (const n of bbox) {
@@ -99,8 +107,9 @@ export function bboxPolygonWkt(bbox: BBox): string {
 }
 
 /**
- * Latest init, forecast hour nearest "now", 10 m wind over the ops bbox.
- * Partition filter on init_time is required for cost control.
+ * Latest init in the active bbox, small lead-hour window, 10 m wind cells.
+ * `init_time` is filtered on both the CTE and the base table so BigQuery can
+ * prune partitions; spatial filter uses clustered `geography` (cell center).
  */
 export function buildWeatherNextWindSql(
   bbox: BBox,
@@ -108,11 +117,18 @@ export function buildWeatherNextWindSql(
 ): string {
   const fq = `\`${table.projectId}.${table.datasetId}.${table.tableId}\``;
   const polygon = bboxPolygonWkt(bbox);
+  const lookback = WEATHERNEXT_OPS_QUERY.initLookbackHours;
+  const leadMin = WEATHERNEXT_OPS_QUERY.leadHourMin;
+  const leadMax = WEATHERNEXT_OPS_QUERY.leadHourMax;
+  const cellLimit = WEATHERNEXT_OPS_QUERY.cellLimit;
+  const initWindow = `init_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${lookback} HOUR)`;
+  const spatial = `ST_INTERSECTS(geography, ST_GEOGFROMTEXT('${polygon}'))`;
   return `
 WITH latest AS (
   SELECT MAX(init_time) AS init_time
   FROM ${fq}
-  WHERE init_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 48 HOUR)
+  WHERE ${initWindow}
+    AND ${spatial}
 )
 SELECT
   ST_Y(t.geography) AS lat,
@@ -123,11 +139,13 @@ SELECT
   f.u_component_of_wind_10m_mean AS u,
   f.v_component_of_wind_10m_mean AS v
 FROM ${fq} AS t, t.forecast AS f, latest
-WHERE t.init_time = latest.init_time
+WHERE t.init_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${lookback} HOUR)
+  AND t.init_time = latest.init_time
   AND latest.init_time IS NOT NULL
-  AND f.hours = GREATEST(1, LEAST(48, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), t.init_time, HOUR)))
-  AND ST_INTERSECTS(t.geography_polygon, ST_GEOGFROMTEXT('${polygon}'))
-LIMIT 32
+  AND ST_INTERSECTS(t.geography, ST_GEOGFROMTEXT('${polygon}'))
+  AND f.hours BETWEEN ${leadMin} AND ${leadMax}
+  AND f.hours = GREATEST(${leadMin}, LEAST(${leadMax}, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), latest.init_time, HOUR)))
+LIMIT ${cellLimit}
 `.trim();
 }
 
