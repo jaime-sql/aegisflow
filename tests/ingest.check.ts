@@ -363,6 +363,7 @@ function uiWiring() {
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /OPS_REGION_OPTIONS/);
   assert.match(top, /onRegionChange/);
+  assert.match(top, /FirmsVerifyButton/);
   const regions = readFileSync("src/lib/regions.ts", "utf8");
   assert.match(regions, /El Salvador \/ WUI/);
   assert.match(regions, /Cascade \(AegisFire-01\)/);

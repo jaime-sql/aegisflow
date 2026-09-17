@@ -1,7 +1,7 @@
 import type { FeedComponent, Hotspot } from "@/lib/schema";
 import { SCHEMA_VERSION } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
-import { remapLatLonToBbox } from "@/lib/regions";
+import { remapLatLonToBbox, resolveOpsRegion } from "@/lib/regions";
 import type { BBox, IngestFetch, IngestEnv } from "./types";
 
 /** Cap live detections per bbox; never collapse the set to a single demo point. */
@@ -42,6 +42,81 @@ function parseCsv(text: string): Record<string, string>[] {
 function hotspotEventId(lat: number, lon: number, acquired: string, index: number): string {
   const token = `${lat.toFixed(4)}_${lon.toFixed(4)}_${acquired}_${index}`.replace(/[^0-9a-z_]/gi, "");
   return `evt_aegisfire01_live_${token}`.toLowerCase().slice(0, 80);
+}
+
+function firmsAreaUrl(bbox: BBox, key: string, product: string): string {
+  const [west, south, east, north] = bbox;
+  return `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${product}/${west},${south},${east},${north}/1`;
+}
+
+function countValidFirmsRows(text: string): number {
+  return parseCsv(text).filter((row) => {
+    const lat = Number(row.latitude);
+    const lon = Number(row.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon);
+  }).length;
+}
+
+export type FirmsProbeResult = {
+  live: boolean;
+  rowCount: number;
+  /** Judge-facing line: `12 rows · LIVE` or the last clear error. */
+  summary: string;
+  error: string | null;
+};
+
+export type FirmsVerifyResult = FirmsProbeResult & {
+  regionId: string;
+  bbox: BBox;
+};
+
+function failProbe(error: string): FirmsProbeResult {
+  return { live: false, rowCount: 0, summary: error, error };
+}
+
+/**
+ * Diagnostic FIRMS pull for the active bbox. Never returns hotspot dots —
+ * Ops map keeps using loadOpsIncident (live or remapped fixture).
+ */
+export async function probeFirms(
+  bbox: BBox,
+  deps: FirmsFetchDeps = {},
+): Promise<FirmsProbeResult> {
+  const env = deps.env ?? process.env;
+  const key = env.FIRMS_MAP_KEY?.trim();
+  const doFetch = deps.fetch ?? fetch;
+
+  if (env.AEGISFLOW_FAIL_FIRMS === "true") {
+    return failProbe("Live pull failed (forced FIRMS adapter failure)");
+  }
+  if (!key) {
+    return failProbe("no FIRMS_MAP_KEY");
+  }
+
+  const product = env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
+  try {
+    const res = await doFetch(firmsAreaUrl(bbox, key, product), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      throw new Error(`FIRMS HTTP ${res.status}`);
+    }
+    const text = await res.text();
+    if (/invalid|error|denied/i.test(text.slice(0, 200)) && !text.includes("latitude")) {
+      throw new Error("FIRMS rejected MAP_KEY or returned an error body");
+    }
+    const rowCount = countValidFirmsRows(text);
+    return {
+      live: true,
+      rowCount,
+      summary: `${rowCount} rows · LIVE`,
+      error: null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown FIRMS error";
+    return failProbe(message);
+  }
 }
 
 function fixtureHotspotsForBbox(bbox: BBox): Hotspot[] {
@@ -92,11 +167,9 @@ export async function fetchFirmsHotspots(
   }
 
   const product = env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
-  const [west, south, east, north] = bbox;
-  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${product}/${west},${south},${east},${north}/1`;
 
   try {
-    const res = await doFetch(url, {
+    const res = await doFetch(firmsAreaUrl(bbox, key, product), {
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
     });
@@ -172,4 +245,18 @@ export async function fetchFirmsHotspots(
       },
     };
   }
+}
+
+/** Probe the active Ops region bbox. Result is diagnostic JSON only — no map dots. */
+export async function verifyFirmsForRegion(
+  regionId?: string | null,
+  deps: FirmsFetchDeps = {},
+): Promise<FirmsVerifyResult> {
+  const region = resolveOpsRegion(regionId);
+  const probe = await probeFirms(region.bbox, deps);
+  return {
+    regionId: region.id,
+    bbox: region.bbox,
+    ...probe,
+  };
 }

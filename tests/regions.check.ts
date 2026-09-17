@@ -178,6 +178,7 @@ function uiWiring() {
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /OPS_REGION_OPTIONS/);
   assert.match(top, /onRegionChange/);
+  assert.match(top, /FirmsVerifyButton/);
   assert.doesNotMatch(top, /defaultValue=\{incident\.incidentId\}/);
   const regionsSrc = readFileSync("src/lib/regions.ts", "utf8");
   assert.match(regionsSrc, /El Salvador \/ WUI/);
