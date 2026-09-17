@@ -5,7 +5,8 @@
   "name": "AegisFire-01 · Sisters / Hwy 20 WUI",
   "status": "active",
   "region": {
-    "name": "Cascade Range — Sisters / Hwy 20 (placeholder until Jaime picks demo region)",
+    "id": "cascade",
+    "name": "Cascade Range — Sisters / Hwy 20 (AegisFire-01)",
     "placeholder": true,
     "center": { "lat": 44.321, "lon": -121.548 },
     "bbox": [-121.92, 44.12, -121.28, 44.52]
