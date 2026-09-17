@@ -20,13 +20,13 @@ incidentId:   AegisFire-01
 schemaVersion: 1.0.0
 ```
 
-Hotspots, wind ticks, agent outputs, feed-health snapshots, and timeline items each have their **own** `eventId`. Agent lineage arrays point at those IDs (FIRMS hotspot events, wind ticks, SOP notes) so a judge can walk a recommendation back to evidence.
+Hotspots, wind ticks, agent outputs, feed-health snapshots, and timeline items each have their **own** `eventId`. Agent lineage arrays point at those IDs (FIRMS hotspot events, WeatherNext wind ticks, SOP notes) so a judge can walk a recommendation back to evidence.
 
 ## Record types
 
 - **IncidentEvent** — fused snapshot the Ops shell loads.
 - **Hotspot** — NASA FIRMS (live or fixture) thermal detection.
-- **WindTick** — mock / IoT wind vector at a point.
+- **WindTick** — WeatherNext 10 m wind (live BigQuery or fixture). Real-time overlay is labeled **Experimental**.
 - **AgentOutput** — one of `fire-propagation` · `evacuation` · `resource-allocation`, with `confidence`, `outputHash`, `lineage[]` and model router metadata (`openai` primary, `deepseek` backup, `fixture` in Stage 1).
 - **FeedHealth** — per-adapter `ok` / `degraded` / `down` so one failed ingest does not blank the board.
 

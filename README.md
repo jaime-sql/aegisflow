@@ -3,7 +3,7 @@
 **IEEE Response Quest Challenge — submission #5395** (Impact Challenge Product, wildfire / WUI).  
 Real-time multi-agent data fusion for wildfire situational awareness.
 
-Stage 1 is a working Next.js Ops foundation: one map-first dashboard, shared event IDs, thin FIRMS + mock wind adapters, three agent stubs, and Clerk RBAC (or a flagged DEV bypass). Architecture approved by Jaime (2026-09-10).
+Stage 2 Phase 1 is live NASA **FIRMS** hotspots plus **WeatherNext** 10 m wind (BigQuery, labeled **Experimental**) on the same Ops map, with fixture fallback and FeedBanner if a feed degrades. Stage 1 still ships Clerk RBAC, three agent stubs, and shared event IDs. Architecture approved by Jaime (2026-09-10).
 
 ## Problem
 
@@ -14,7 +14,7 @@ Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citi
 | Layer | Stage 1 |
 | --- | --- |
 | Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. |
-| Ingest | NASA **FIRMS** hotspots (live or fixture) + **mock wind**. One feed can fail without blanking Ops. |
+| Ingest | NASA **FIRMS** hotspots (live or fixture) + **WeatherNext** 10 m wind (BigQuery, Experimental; fixture fallback). One feed can fail without blanking Ops. |
 | Agents | Fire propagation · Evacuation logistics · Resource allocation. OpenAI primary / DeepSeek backup **stubs**. |
 | Runtime | **Modal-ready** worker stub (`workers/modal_stub.py`); runs locally for the demo. |
 | UI | **One** Next.js Ops dashboard (dark ops). Map ~60–70% width. No Replit second map. No live Fabric map. |
@@ -106,7 +106,10 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. Prod paths are `/aegisflow/sign-in` etc. |
 | `BASE_PATH` / `CLOUDFLARE_PROD` | Prod `basePath` / `assetPrefix` = `/aegisflow`. Unset locally. |
 | `AEGISFLOW_ORIGIN` | Path Worker only. Service-bind dest = OpenNext `workers.dev` origin (never the inbound Host). |
-| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. |
+| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. Wrangler secret on Worker `aegisflow`. |
+| `GCP_SA_JSON` | GCP service-account JSON for project `aegisflow-ieee-quest`. Empty → fixture wind. Wrangler secret. |
+| `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
+| `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
 | `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
 | `AEGISFLOW_LIVE_LLM` | Must be `true` before any live LLM path is used (still a stub in Stage 1). |
@@ -118,11 +121,12 @@ src/app/                 /ops dashboard + /fabric twin + /sign-in + /api/ops/inc
 src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lineage drawer
 src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/base-path.ts     env-driven `/aegisflow` prefix
-src/lib/ingest/          firms.ts · wind.ts
+src/lib/ingest/          firms.ts · wind.ts (WeatherNext BigQuery) · weathernext.ts
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
 src/lib/pii.ts           crowdsource scrubber
 fixtures/aegisfire-01.json
 docs/event-schema.md
+docs/weathernext.md
 workers/modal_stub.py
 workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
 .github/workflows/cloudflare-prod.yml
@@ -146,8 +150,11 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - `CLOUDFLARE_API_TOKEN` — Pages + Workers edit on account `8a8c9483df8e8a2a9adec437a0994fe4` (same token pattern as Rosario). Confirm this secret exists on **this** repo; it is not inherited from another project.
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
-   - Optional: `FIRMS_MAP_KEY` (otherwise Ops uses the fixture). Set it as a Wrangler secret on Worker `aegisflow` if you want live FIRMS in prod.
-4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads `CLERK_SECRET_KEY` **and** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as Worker secrets; path vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+   - Optional live ingest (otherwise Ops uses the AegisFire-01 fixture and FeedBanner stays quiet):
+     - `FIRMS_MAP_KEY` — NASA FIRMS MAP key. Also uploaded as Wrangler secret `FIRMS_MAP_KEY` on Worker `aegisflow`.
+     - `GCP_SA_JSON` — service-account JSON for GCP project `aegisflow-ieee-quest` (BigQuery Job User + Data Viewer on the WeatherNext Analytics Hub dataset). Wrangler secret `GCP_SA_JSON`.
+   - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads Clerk keys **and** ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON` as Worker secrets; path and WeatherNext dataset vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
 5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
    - `https://cortexmatter.com/aegisflow` → Clerk sign-in (`/aegisflow/sign-in`) or `/aegisflow/ops` after auth. Must **not** be HTTP 500.
@@ -214,4 +221,4 @@ AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, w
 
 ## Secrets
 
-Do not commit Clerk, FIRMS, OpenAI, DeepSeek, Modal, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` belong.
+Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` belong.

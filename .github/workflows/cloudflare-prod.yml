@@ -91,13 +91,23 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '8a8c9483df8e8a2a9adec437a0994fe4' }}
+          # Ingest Worker secrets (Jaime must create GitHub Actions secrets):
+          #   FIRMS_MAP_KEY  — NASA FIRMS MAP key
+          #   GCP_SA_JSON    — service-account JSON for GCP project aegisflow-ieee-quest
+          # These are uploaded as Wrangler secrets on Worker `aegisflow`. Empty is OK;
+          # adapters then serve AegisFire-01 fixtures and FeedBanner stays quiet.
+          # Optional: `npx wrangler secret put FIRMS_MAP_KEY` / `npx wrangler secret put GCP_SA_JSON`
           command: deploy
           secrets: |
             CLERK_SECRET_KEY
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            FIRMS_MAP_KEY
+            GCP_SA_JSON
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRD }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_PRD }}
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
 
       - name: Deploy path Worker
         uses: cloudflare/wrangler-action@v3

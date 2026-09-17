@@ -1,6 +1,7 @@
 import type { FeedComponent, Hotspot } from "@/lib/schema";
 import { SCHEMA_VERSION } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import type { BBox, IngestFetch, IngestEnv } from "./types";
 
 export type FirmsResult = {
   hotspots: Hotspot[];
@@ -8,7 +9,10 @@ export type FirmsResult = {
   usedFixture: boolean;
 };
 
-type BBox = [number, number, number, number];
+export type FirmsFetchDeps = {
+  fetch?: IngestFetch;
+  env?: IngestEnv;
+};
 
 function mapConfidence(raw: string | undefined): Hotspot["confidence"] {
   const v = (raw ?? "").toLowerCase();
@@ -41,12 +45,31 @@ function hotspotEventId(lat: number, lon: number, acquired: string, index: numbe
  * is missing or the request fails (graceful degrade).
  * Docs: https://firms.modaps.eosdis.nasa.gov/api/area/
  */
-export async function fetchFirmsHotspots(bbox: BBox): Promise<FirmsResult> {
+export async function fetchFirmsHotspots(
+  bbox: BBox,
+  deps: FirmsFetchDeps = {},
+): Promise<FirmsResult> {
   const now = new Date().toISOString();
-  const key = process.env.FIRMS_MAP_KEY?.trim();
+  const env = deps.env ?? process.env;
+  const key = env.FIRMS_MAP_KEY?.trim();
   const fixture = loadFixtureIncident();
+  const doFetch = deps.fetch ?? fetch;
 
-  if (!key) {
+  if (env.AEGISFLOW_FAIL_FIRMS === "true") {
+    return {
+      hotspots: fixture.hotspots.map((h) => ({ ...h, degraded: true })),
+      usedFixture: true,
+      health: {
+        id: "firms",
+        label: "NASA FIRMS",
+        status: "degraded",
+        detail: "Live pull failed (forced FIRMS adapter failure) — fixture in use",
+        lastSuccessAt: fixture.hotspots[0]?.observedAt ?? null,
+      },
+    };
+  }
+
+  if (!key || env.AEGISFLOW_USE_FIRMS_FIXTURE === "true") {
     return {
       hotspots: fixture.hotspots,
       usedFixture: true,
@@ -60,12 +83,15 @@ export async function fetchFirmsHotspots(bbox: BBox): Promise<FirmsResult> {
     };
   }
 
-  const product = process.env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
+  const product = env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
   const [west, south, east, north] = bbox;
   const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${product}/${west},${south},${east},${north}/1`;
 
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await doFetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
     if (!res.ok) {
       throw new Error(`FIRMS HTTP ${res.status}`);
     }

@@ -30,6 +30,9 @@ export function LineageDrawer({
       </div>
       <div className="ops-scroll flex-1 space-y-3 overflow-y-auto px-4 py-3 text-[12px]">
         <p className="font-mono text-[11px] text-[#3DB9FF]">{agent.eventId}</p>
+        <p className="text-[11px] text-[#8B9BB8]">
+          Lineage cites NASA FIRMS hotspots and WeatherNext wind (Experimental).
+        </p>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
             Inputs
