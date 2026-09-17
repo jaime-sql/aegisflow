@@ -7,6 +7,7 @@ import type { OpsSession } from "@/lib/auth/session";
 import { OPS_REGION_OPTIONS, resolveRegionId, type RegionId } from "@/lib/regions";
 import { feedDisplay, feedDotClass } from "@/lib/ui/status";
 import { SimBadge } from "./SimBadge";
+import { FirmsVerifyButton } from "./FirmsVerifyButton";
 
 const ClerkUserButton = dynamic(
   () => import("./ClerkUserButton").then((m) => m.ClerkUserButton),
@@ -64,14 +65,15 @@ export function TopBar({
             const feed = incident.feedHealth.feeds.find((f) => f.id === id);
             if (!feed) return null;
             return (
-              <span
-                key={feed.id}
-                title={feed.detail}
-                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]"
-              >
-                {feed.label.replace("NASA ", "")}
-                <span className={`h-1.5 w-1.5 rounded-full ${feedDotClass(feed.status)}`} />
-                <span className="text-[#E8EEF9]">{feedDisplay(feed.status)}</span>
+              <span key={feed.id} title={feed.detail} className="flex items-center gap-1">
+                <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
+                  {feed.label.replace("NASA ", "")}
+                  <span className={`h-1.5 w-1.5 rounded-full ${feedDotClass(feed.status)}`} />
+                  <span className="text-[#E8EEF9]">{feedDisplay(feed.status)}</span>
+                </span>
+                {id === "firms" ? (
+                  <FirmsVerifyButton regionId={regionId} disabled={switching} />
+                ) : null}
               </span>
             );
           })}
