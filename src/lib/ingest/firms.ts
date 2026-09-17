@@ -1,7 +1,11 @@
 import type { FeedComponent, Hotspot } from "@/lib/schema";
 import { SCHEMA_VERSION } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import { remapLatLonToBbox } from "@/lib/regions";
 import type { BBox, IngestFetch, IngestEnv } from "./types";
+
+/** Cap live detections per bbox; never collapse the set to a single demo point. */
+export const MAX_FIRMS_HOTSPOTS = 40;
 
 export type FirmsResult = {
   hotspots: Hotspot[];
@@ -40,6 +44,10 @@ function hotspotEventId(lat: number, lon: number, acquired: string, index: numbe
   return `evt_aegisfire01_live_${token}`.toLowerCase().slice(0, 80);
 }
 
+function fixtureHotspotsForBbox(bbox: BBox): Hotspot[] {
+  return remapLatLonToBbox(loadFixtureIncident().hotspots, bbox);
+}
+
 /**
  * NASA FIRMS area CSV. Falls back to AegisFire-01 fixture when FIRMS_MAP_KEY
  * is missing or the request fails (graceful degrade).
@@ -52,33 +60,33 @@ export async function fetchFirmsHotspots(
   const now = new Date().toISOString();
   const env = deps.env ?? process.env;
   const key = env.FIRMS_MAP_KEY?.trim();
-  const fixture = loadFixtureIncident();
+  const fixture = fixtureHotspotsForBbox(bbox);
   const doFetch = deps.fetch ?? fetch;
 
   if (env.AEGISFLOW_FAIL_FIRMS === "true") {
     return {
-      hotspots: fixture.hotspots.map((h) => ({ ...h, degraded: true })),
+      hotspots: fixture.map((h) => ({ ...h, degraded: true })),
       usedFixture: true,
       health: {
         id: "firms",
         label: "NASA FIRMS",
         status: "degraded",
         detail: "Live pull failed (forced FIRMS adapter failure) — fixture in use",
-        lastSuccessAt: fixture.hotspots[0]?.observedAt ?? null,
+        lastSuccessAt: fixture[0]?.observedAt ?? null,
       },
     };
   }
 
   if (!key || env.AEGISFLOW_USE_FIRMS_FIXTURE === "true") {
     return {
-      hotspots: fixture.hotspots,
+      hotspots: fixture,
       usedFixture: true,
       health: {
         id: "firms",
         label: "NASA FIRMS",
         status: "ok",
         detail: "Fixture VIIRS hotspots (no FIRMS_MAP_KEY)",
-        lastSuccessAt: fixture.hotspots[0]?.observedAt ?? now,
+        lastSuccessAt: fixture[0]?.observedAt ?? now,
       },
     };
   }
@@ -123,11 +131,11 @@ export async function fetchFirmsHotspots(
         return hotspot;
       })
       .filter((h): h is Hotspot => h !== null)
-      .slice(0, 40);
+      .slice(0, MAX_FIRMS_HOTSPOTS);
 
     if (hotspots.length === 0) {
       return {
-        hotspots: fixture.hotspots,
+        hotspots: fixture,
         usedFixture: true,
         health: {
           id: "firms",
@@ -153,14 +161,14 @@ export async function fetchFirmsHotspots(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown FIRMS error";
     return {
-      hotspots: fixture.hotspots.map((h) => ({ ...h, degraded: true })),
+      hotspots: fixture.map((h) => ({ ...h, degraded: true })),
       usedFixture: true,
       health: {
         id: "firms",
         label: "NASA FIRMS",
         status: "degraded",
         detail: `Live pull failed (${message}) — fixture in use`,
-        lastSuccessAt: fixture.hotspots[0]?.observedAt ?? null,
+        lastSuccessAt: fixture[0]?.observedAt ?? null,
       },
     };
   }

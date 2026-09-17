@@ -1,6 +1,6 @@
 # WeatherNext ingest (Stage 2 Phase 1)
 
-Ops maps **WeatherNext 3** 10 m wind as a cyan overlay on the existing Cascade / AegisFire-01 map. Real-time WeatherNext is **Experimental** (historic data is CC BY 4.0). There is no second map.
+Ops maps **WeatherNext 3** 10 m wind as a cyan overlay on the **same** Ops map. Default bbox is **El Salvador / WUI**; Cascade (AegisFire-01) is selectable from the TopBar. Real-time WeatherNext is **Experimental** (historic data is CC BY 4.0). There is no second map. Region catalog: [`docs/regions.md`](regions.md).
 
 ## GCP project
 
@@ -79,4 +79,4 @@ npx wrangler secret put FIRMS_MAP_KEY
 npx wrangler secret put GCP_SA_JSON
 ```
 
-Until those secrets exist, Ops keeps serving the Cascade fixture and does not blank the page.
+Until those secrets exist, Ops keeps serving the remapped AegisFire-01 fixture in the selected bbox and does not blank the page.

@@ -139,6 +139,7 @@ export const IncidentEventSchema = z.object({
   name: z.string(),
   status: z.enum(["active", "contained", "patrol"]),
   region: z.object({
+    id: z.enum(["el-salvador", "cascade"]),
     name: z.string(),
     placeholder: z.boolean(),
     center: GeoPointSchema,

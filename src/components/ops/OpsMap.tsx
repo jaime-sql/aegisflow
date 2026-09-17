@@ -25,31 +25,66 @@ function windDest(w: WindTick): [number, number] {
   return [w.lat + dLat, w.lon + dLon];
 }
 
-export function OpsMap({ incident }: { incident: IncidentEvent }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
+function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
+  group.clearLayers();
 
-  useEffect(() => {
-    if (!ref.current || mapRef.current) return;
+  for (const h of incident.hotspots) {
+    L.circleMarker([h.lat, h.lon], {
+      radius: 5 + Math.min(h.brightnessK / 80, 8),
+      color: "#1a0e08",
+      weight: 1,
+      fillColor: hotspotColor(h.confidence),
+      fillOpacity: 0.9,
+    })
+      .bindPopup(
+        `<div style="font-family:ui-monospace,monospace">
+            <div style="color:#FF4D2E">${h.eventId}</div>
+            <div>${h.confidence} · ${h.brightnessK.toFixed(0)} K</div>
+          </div>`,
+      )
+      .addTo(group);
+  }
 
-    L.Icon.Default.mergeOptions({
-      iconUrl: `${leafletIconPath}/marker-icon.png`,
-      iconRetinaUrl: `${leafletIconPath}/marker-icon-2x.png`,
-      shadowUrl: `${leafletIconPath}/marker-shadow.png`,
-    });
+  for (const w of incident.wind) {
+    const dest = windDest(w);
+    L.polyline(
+      [
+        [w.lat, w.lon],
+        dest,
+      ],
+      {
+        color: "#3DB9FF",
+        weight: 2,
+        opacity: 0.9,
+      },
+    ).addTo(group);
+    L.circleMarker(dest, {
+      radius: 3,
+      color: "#3DB9FF",
+      fillColor: "#3DB9FF",
+      fillOpacity: 1,
+      weight: 0,
+    })
+      .bindPopup(
+        `<div style="font-family:ui-monospace,monospace">${w.source === "WEATHERNEXT" ? "WeatherNext · Experimental<br/>" : ""}${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
+      )
+      .addTo(group);
+  }
 
-    const map = L.map(ref.current, {
-      zoomControl: true,
-      attributionControl: true,
-    }).setView([incident.region.center.lat, incident.region.center.lon], 11);
+  L.circleMarker(
+    [incident.region.center.lat + 0.04, incident.region.center.lon - 0.06],
+    {
+      radius: 6,
+      color: "#3DB9FF",
+      weight: 2,
+      fillColor: "#8B9BB8",
+      fillOpacity: 0.9,
+    },
+  )
+    .bindPopup("RF / edge mesh · SIM<br/>evt_aegisfire01_tl_04")
+    .addTo(group);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors",
-      subdomains: "abc",
-      className: "ops-dark-tiles",
-      maxZoom: 19,
-    }).addTo(map);
-
+  if (incident.region.id === "cascade") {
     L.polyline(
       [
         [44.304, -121.642],
@@ -65,57 +100,7 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       },
     )
       .bindPopup("Safe corridor · Hwy 20 EB (planned)")
-      .addTo(map);
-
-    for (const h of incident.hotspots) {
-      L.circleMarker([h.lat, h.lon], {
-        radius: 5 + Math.min(h.brightnessK / 80, 8),
-        color: "#1a0e08",
-        weight: 1,
-        fillColor: hotspotColor(h.confidence),
-        fillOpacity: 0.9,
-      })
-        .bindPopup(
-          `<div style="font-family:ui-monospace,monospace">
-            <div style="color:#FF4D2E">${h.eventId}</div>
-            <div>${h.confidence} · ${h.brightnessK.toFixed(0)} K</div>
-          </div>`,
-        )
-        .addTo(map);
-    }
-
-    for (const w of incident.wind) {
-      const dest = windDest(w);
-      L.polyline([[w.lat, w.lon], dest], {
-        color: "#3DB9FF",
-        weight: 2,
-        opacity: 0.9,
-      }).addTo(map);
-      L.circleMarker(dest, {
-        radius: 3,
-        color: "#3DB9FF",
-        fillColor: "#3DB9FF",
-        fillOpacity: 1,
-        weight: 0,
-      })
-        .bindPopup(
-          `<div style="font-family:ui-monospace,monospace">${w.source === "WEATHERNEXT" ? "WeatherNext · Experimental<br/>" : ""}${w.eventId}<br/>${w.speedMps} m/s from ${w.directionDeg}°</div>`,
-        )
-        .addTo(map);
-    }
-
-    L.circleMarker(
-      [incident.region.center.lat + 0.04, incident.region.center.lon - 0.06],
-      {
-        radius: 6,
-        color: "#3DB9FF",
-        weight: 2,
-        fillColor: "#8B9BB8",
-        fillOpacity: 0.9,
-      },
-    )
-      .bindPopup("RF / edge mesh · SIM<br/>evt_aegisfire01_tl_04")
-      .addTo(map);
+      .addTo(group);
 
     L.circleMarker([44.301, -121.525], {
       radius: 6,
@@ -131,17 +116,72 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
           <div style="opacity:.7">original PII never shown in Ops panels</div>
         </div>`,
       )
-      .addTo(map);
+      .addTo(group);
+  }
+}
 
+function fitRegion(map: L.Map, incident: IncidentEvent) {
+  const [west, south, east, north] = incident.region.bbox;
+  const maxZoom = incident.region.id === "el-salvador" ? 9 : 12;
+  map.fitBounds(
+    [
+      [south, west],
+      [north, east],
+    ],
+    { padding: [28, 28], maxZoom, animate: false },
+  );
+}
+
+export function OpsMap({ incident }: { incident: IncidentEvent }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const layersRef = useRef<L.LayerGroup | null>(null);
+
+  useEffect(() => {
+    if (!ref.current || mapRef.current) return;
+
+    L.Icon.Default.mergeOptions({
+      iconUrl: `${leafletIconPath}/marker-icon.png`,
+      iconRetinaUrl: `${leafletIconPath}/marker-icon-2x.png`,
+      shadowUrl: `${leafletIconPath}/marker-shadow.png`,
+    });
+
+    const map = L.map(ref.current, {
+      zoomControl: true,
+      attributionControl: true,
+    }).setView([incident.region.center.lat, incident.region.center.lon], 8);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      subdomains: "abc",
+      className: "ops-dark-tiles",
+      maxZoom: 19,
+    }).addTo(map);
+
+    const layers = L.layerGroup().addTo(map);
+    layersRef.current = layers;
     mapRef.current = map;
+    drawIncidentLayers(layers, incident);
+    fitRegion(map, incident);
     setTimeout(() => map.invalidateSize(), 50);
 
     return () => {
       map.remove();
       mapRef.current = null;
+      layersRef.current = null;
     };
+    // Map instance is created once; overlays remap when `incident` changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const layers = layersRef.current;
+    if (!map || !layers) return;
+    drawIncidentLayers(layers, incident);
+    fitRegion(map, incident);
+    map.invalidateSize();
+  }, [incident]);
 
   return (
     <div className="relative h-full min-h-[320px] w-full">
@@ -157,9 +197,11 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
           <div className="flex items-center gap-2">
             <span className="h-0.5 w-4 bg-[#3DB9FF]" /> Wind overlay
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-0.5 w-4 bg-[#3DDC97]" /> Corridor
-          </div>
+          {incident.region.id === "cascade" && (
+            <div className="flex items-center gap-2">
+              <span className="h-0.5 w-4 bg-[#3DDC97]" /> Corridor
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-1">
           <ExperimentalBadge label="WeatherNext" />

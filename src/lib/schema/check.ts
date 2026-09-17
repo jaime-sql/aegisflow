@@ -13,6 +13,9 @@ function main() {
   if (parsed.incidentId !== "AegisFire-01") {
     throw new Error(`Unexpected incidentId: ${parsed.incidentId}`);
   }
+  if (parsed.region.id !== "cascade") {
+    throw new Error(`Unexpected fixture region.id: ${parsed.region.id}`);
+  }
   if (parsed.schemaVersion !== "1.0.0") {
     throw new Error(`Unexpected schemaVersion: ${parsed.schemaVersion}`);
   }
