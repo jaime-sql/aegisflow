@@ -7,7 +7,7 @@ export function ExecSummaryCard({
   incident: IncidentEvent;
   onViewLineage: () => void;
 }) {
-  const sources = ["FIRMS", "Wind", "RAG"];
+  const sources = ["FIRMS", "WeatherNext", "RAG"];
   return (
     <section className="border-b border-[#1E2A40] px-4 py-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">

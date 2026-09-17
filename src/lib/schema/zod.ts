@@ -51,7 +51,7 @@ export const WindTickSchema = z.object({
   directionDeg: z.number().gte(0).lt(360),
   gustMps: z.number().nonnegative().optional(),
   observedAt: IsoDateTimeSchema,
-  source: z.enum(["MOCK_WIND", "IOT_WIND"]),
+  source: z.enum(["MOCK_WIND", "IOT_WIND", "WEATHERNEXT"]),
   degraded: z.boolean().optional(),
 });
 
