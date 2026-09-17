@@ -182,7 +182,7 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
   return (
     <div className="relative h-full min-h-[320px] w-full">
       <div ref={ref} className="absolute inset-0 z-0" />
-      <div className="pointer-events-none absolute bottom-8 left-3 z-[500] space-y-2">
+      <div className="pointer-events-none absolute bottom-16 left-3 z-[500] space-y-2">
         <div className="rounded-md border border-[#1E2A40] bg-[#121A2B]/90 px-3 py-2 text-[11px] backdrop-blur">
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
             Legend

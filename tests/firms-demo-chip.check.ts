@@ -197,6 +197,7 @@ function uiWiring() {
   assert.match(chip, /bg-\[#0B1220\]/);
   assert.match(chip, /text-\[#FFB020\]/);
   assert.match(chip, /text-\[9px\]/);
+  assert.match(chip, /whitespace-nowrap/);
   assert.equal(FIRMS_DEMO_CHIP_LABEL, "Hotspots · DEMO FIXTURE");
   assert.equal(FIRMS_DEMO_POPUP_LINE, "Demo fixture · not live FIRMS");
 
