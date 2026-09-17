@@ -142,7 +142,7 @@ function uiWiring() {
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.doesNotMatch(shell, /firms-verify/);
-  assert.match(shell, /opsIncidentUrl/);
+  assert.doesNotMatch(shell, /onRegionChange/);
 }
 
 async function main() {

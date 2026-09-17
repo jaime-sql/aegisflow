@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
-import { withBasePath } from "@/lib/base-path";
-import { OPS_REGION_OPTIONS, resolveRegionId, type RegionId } from "@/lib/regions";
+import { resolveRegionId } from "@/lib/regions";
 import { feedDisplay, feedDotClass } from "@/lib/ui/status";
 import { publicWindBannerDetail } from "@/lib/ui/wind-feed";
 import { SimBadge } from "./SimBadge";
@@ -22,20 +21,13 @@ const PRIMARY_FEEDS = ["firms", "wind", "crowd"] as const;
 export function TopBar({
   incident,
   session,
-  switching = false,
-  onRegionChange,
+  regionPicker,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
-  switching?: boolean;
-  onRegionChange?: (regionId: RegionId) => void;
+  regionPicker: ReactNode;
 }) {
-  const incidentRegion = resolveRegionId(incident.region.id);
-  const [regionId, setRegionId] = useState(incidentRegion);
-
-  useEffect(() => {
-    if (!switching) setRegionId(incidentRegion);
-  }, [incidentRegion, switching]);
+  const regionId = resolveRegionId(incident.region.id);
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#1E2A40] bg-[#0B1220] px-3">
@@ -48,46 +40,7 @@ export function TopBar({
 
       <div className="hidden h-6 w-px bg-[#1E2A40] sm:block" />
 
-      <form
-        className="flex min-w-0 items-center gap-1.5"
-        action={withBasePath("/ops")}
-        method="get"
-        onSubmit={(event) => {
-          // Client fetch remaps in place. Native GET /ops?region= is the
-          // no-JS / failed-hydration path and must stay under basePath.
-          if (onRegionChange) event.preventDefault();
-        }}
-      >
-        <label className="flex min-w-0 items-center gap-1.5">
-          <span className="sr-only">Region</span>
-          <select
-            name="region"
-            className="max-w-[260px] truncate rounded border border-[#1E2A40] bg-[#121A2B] px-2 py-1 text-sm text-[#E8EEF9]"
-            value={regionId}
-            aria-label="Region"
-            aria-busy={switching}
-            disabled={switching}
-            onChange={(event) => {
-              const next = resolveRegionId(event.target.value);
-              setRegionId(next);
-              if (onRegionChange) {
-                onRegionChange(next);
-                return;
-              }
-              event.currentTarget.form?.submit();
-            }}
-          >
-            {OPS_REGION_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="sr-only">
-          Load region
-        </button>
-      </form>
+      {regionPicker}
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <div className="hidden items-center gap-2 md:flex">
@@ -110,7 +63,7 @@ export function TopBar({
                   <span className="text-[#E8EEF9]">{feedDisplay(feed.status)}</span>
                 </span>
                 {id === "firms" ? (
-                  <FirmsVerifyButton regionId={regionId} disabled={switching} />
+                  <FirmsVerifyButton regionId={regionId} />
                 ) : null}
               </span>
             );
