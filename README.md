@@ -3,7 +3,7 @@
 **IEEE Response Quest Challenge — submission #5395** (Impact Challenge Product, wildfire / WUI).  
 Real-time multi-agent data fusion for wildfire situational awareness.
 
-Stage 2 Phase 1 is live NASA **FIRMS** hotspots plus **WeatherNext** 10 m wind (BigQuery, labeled **Experimental**) on the same Ops map, with fixture fallback and FeedBanner if a feed degrades. Stage 1 still ships Clerk RBAC, three agent stubs, and shared event IDs. Architecture approved by Jaime (2026-09-10).
+Stage 2 Phase 2 wires the three Ops agents to **Modal** workers plus **OpenAI** (primary) / **DeepSeek** (backup), with fixture fallback and honest agent status when keys are missing. Phase 1 is live NASA **FIRMS** hotspots plus **WeatherNext** 10 m wind (BigQuery, labeled **Experimental**) on the same Ops map. Stage 1 still ships Clerk RBAC and shared event IDs. Architecture approved by Jaime (2026-09-10).
 
 ## Problem
 
@@ -15,8 +15,8 @@ Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citi
 | --- | --- |
 | Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. |
 | Ingest | NASA **FIRMS** hotspots (live or fixture) + **WeatherNext** 10 m wind (BigQuery, Experimental; fixture fallback). One feed can fail without blanking Ops. |
-| Agents | Fire propagation · Evacuation logistics · Resource allocation. OpenAI primary / DeepSeek backup **stubs**. |
-| Runtime | **Modal-ready** worker stub (`workers/modal_stub.py`); runs locally for the demo. |
+| Agents | Fire propagation · Evacuation logistics · Resource allocation. **OpenAI** primary / **DeepSeek** backup, hosted on **Modal** when `MODAL_ENDPOINT` is set. Missing keys → fixture (AgentChip shows **Fixture**, not silent live confidence). |
+| Runtime | Modal worker (`workers/modal_stub.py`) — `python3 workers/modal_stub.py` locally; `modal deploy` for live HTTP. |
 | UI | **One** Next.js Ops dashboard (dark ops). Map ~60–70% width. No Replit second map. No live Fabric map. |
 | IDs | Shared `eventId` + `schemaVersion` for Ops **and** a future Fabric twin. See [`docs/event-schema.md`](docs/event-schema.md). |
 | RF / mesh | Labeled **SIM** only. No live RF. |
@@ -112,9 +112,9 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
 | `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions with a 90s BigQuery budget. Ops reads cache only. Signed-in `GET /aegisflow/api/ops/wind-cache-refresh` is a one-shot fill. |
-| `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
-| `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
-| `AEGISFLOW_LIVE_LLM` | Must be `true` before any live LLM path is used (still a stub in Stage 1). |
+| `OPENAI_API_KEY` / `DEEPSEEK_*` | LLM router. Empty → fixture agents (CI). Live: OpenAI primary, DeepSeek backup. See [`docs/agents.md`](docs/agents.md). |
+| `MODAL_ENDPOINT` / `MODAL_TOKEN_*` | Preferred agent host. Empty → local LLM or fixture. Proxy-auth headers sent when tokens are set. |
+| `AEGISFLOW_LIVE_LLM` | Set `false` to force fixture even if keys exist. |
 
 ## Repo layout
 
@@ -125,15 +125,16 @@ src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/base-path.ts     env-driven `/aegisflow` prefix
 src/lib/ingest/          firms.ts · wind.ts (cache-first) · wind-cache.ts · weathernext.ts
 src/lib/regions.ts       El Salvador / WUI (default) + Cascade catalog
-src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
+src/lib/agents/          three agents + OpenAI/DeepSeek/Modal runtime (fixture fallback)
 src/lib/pii.ts           crowdsource scrubber
 fixtures/aegisfire-01.json
 docs/event-schema.md
 docs/regions.md
 docs/weathernext.md
+docs/agents.md
 cloudflare-worker.ts     OpenNext fetch + WeatherNext KV cron
 scripts/ensure-wind-cache-kv.mjs
-workers/modal_stub.py
+workers/modal_stub.py    local printer + `modal deploy` HTTP worker
 workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
 .github/workflows/cloudflare-prod.yml
 ```
@@ -159,8 +160,13 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - Optional live ingest (otherwise Ops uses the AegisFire-01 fixture and FeedBanner stays quiet):
      - `FIRMS_MAP_KEY` — NASA FIRMS MAP key. Also uploaded as Wrangler secret `FIRMS_MAP_KEY` on Worker `aegisflow`.
      - `GCP_SA_JSON` — service-account JSON for GCP project `aegisflow-ieee-quest` (BigQuery Job User + Data Viewer on the WeatherNext Analytics Hub dataset). Wrangler secret `GCP_SA_JSON`.
+   - Optional live agents (otherwise AgentChip shows **Fixture**; Ops stays up). See [`docs/agents.md`](docs/agents.md):
+     - `OPENAI_API_KEY` — primary LLM. Wrangler secret.
+     - `DEEPSEEK_API_KEY` — cheaper backup LLM. Wrangler secret.
+     - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var.
+     - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal proxy token. Wrangler secrets.
    - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
-4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys **and** ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON` as Worker secrets; path, WeatherNext dataset, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys, ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON`, and agent secrets `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_*` as Worker secrets; path, WeatherNext dataset, `DEEPSEEK_BASE_URL`, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
    - If the KV step fails, the API token needs Workers KV edit, or Jaime runs `npx wrangler kv namespace create WIND_CACHE` once and pastes the id into `wrangler.jsonc`. See [`docs/weathernext.md`](docs/weathernext.md).
 5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
@@ -228,4 +234,4 @@ AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, w
 
 ## Secrets
 
-Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` belong.
+Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_TOKEN_SECRET` belong.

@@ -31,7 +31,7 @@ Hotspots, wind ticks, agent outputs, feed-health snapshots, and timeline items e
 - **IncidentEvent** — fused snapshot the Ops shell loads.
 - **Hotspot** — NASA FIRMS (live or fixture) thermal detection.
 - **WindTick** — WeatherNext 10 m wind (live BigQuery or fixture). Real-time overlay is labeled **Experimental**.
-- **AgentOutput** — one of `fire-propagation` · `evacuation` · `resource-allocation`, with `confidence`, `outputHash`, `lineage[]` and model router metadata (`openai` primary, `deepseek` backup, `fixture` in Stage 1).
+- **AgentOutput** — one of `fire-propagation` · `evacuation` · `resource-allocation`, with `confidence`, `outputHash`, `lineage[]` and model router metadata (`openai` primary, `deepseek` backup, `fixture` when keys are missing). Live Modal/LLM failures set `degraded: true` and **cap confidence at 0.40** so Ops never shows a silent fake live score. Agent `eventId`s stay `evt_aegisfire01_agent_*` (Cascade) or `evt_svwui_agent_*` (El Salvador); lineage cites the hotspot/wind IDs currently on the map. See [`docs/agents.md`](agents.md).
 - **FeedHealth** — per-adapter `ok` / `degraded` / `down` so one failed ingest does not blank the board.
 
 ## Fabric twin

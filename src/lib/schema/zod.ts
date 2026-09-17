@@ -87,6 +87,8 @@ export const AgentOutputSchema = z.object({
     runtime: z.enum(["local", "modal"]),
   }),
   producedAt: IsoDateTimeSchema,
+  /** True when a live Modal/LLM attempt failed and fixture text was substituted. */
+  degraded: z.boolean().optional(),
 });
 
 export const FeedStatusSchema = z.enum(["ok", "degraded", "down"]);

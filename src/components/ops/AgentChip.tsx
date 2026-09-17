@@ -1,5 +1,5 @@
 import type { AgentOutput } from "@/lib/schema";
-import { agentShortName } from "@/lib/ui/status";
+import { agentShortName, agentStatusClass, agentStatusLabel } from "@/lib/ui/status";
 
 export function AgentChip({
   agent,
@@ -10,6 +10,7 @@ export function AgentChip({
   active: boolean;
   onSelect: () => void;
 }) {
+  const status = agentStatusLabel(agent);
   return (
     <button
       type="button"
@@ -24,8 +25,11 @@ export function AgentChip({
         <span className="h-1.5 w-1.5 rounded-full bg-[#FF4D2E]" />
         {agentShortName(agent.agentId)}
       </span>
-      <span className="font-mono text-[11px] text-[#8B9BB8]">
-        conf {agent.confidence.toFixed(2)}
+      <span className="flex items-center gap-2 font-mono text-[11px] text-[#8B9BB8]">
+        <span className={agentStatusClass(status)}>{status}</span>
+        <span>
+          {agent.model.used} · conf {agent.confidence.toFixed(2)}
+        </span>
       </span>
     </button>
   );

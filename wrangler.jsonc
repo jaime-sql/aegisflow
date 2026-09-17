@@ -40,9 +40,10 @@
     }
   ],
   // Non-secret runtime env. OpenNext middleware / RSC read process.env here;
-  // next.config.ts inlines the same values at build. Clerk keys and ingest
-  // secrets (FIRMS_MAP_KEY, GCP_SA_JSON) are Worker secrets — see
-  // cloudflare-prod.yml — not vars.
+  // next.config.ts inlines the same values at build. Clerk keys, ingest
+  // secrets (FIRMS_MAP_KEY, GCP_SA_JSON), and agent secrets (OPENAI_API_KEY,
+  // DEEPSEEK_API_KEY, MODAL_*) are Worker secrets — see cloudflare-prod.yml —
+  // not vars.
   "vars": {
     "NEXTJS_ENV": "production",
     "CLOUDFLARE_PROD": "true",
@@ -58,6 +59,7 @@
     "GCP_PROJECT_ID": "aegisflow-ieee-quest",
     "WEATHERNEXT_BQ_DATASET": "weathernext",
     "WEATHERNEXT_BQ_TABLE": "weathernext_3_0_0_0p1deg",
-    "WEATHERNEXT_BQ_LOCATION": "US"
+    "WEATHERNEXT_BQ_LOCATION": "US",
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com"
   }
 }

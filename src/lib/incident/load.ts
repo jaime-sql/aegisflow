@@ -3,6 +3,7 @@ import type { FirmsFetchDeps } from "@/lib/ingest/firms";
 import { fetchWindTicks } from "@/lib/ingest/wind";
 import type { WindFetchDeps } from "@/lib/ingest/wind";
 import { runAllAgents } from "@/lib/agents";
+import type { AgentRuntimeDeps } from "@/lib/agents";
 import { cloneFixtureIncident } from "@/lib/fixtures/aegisfire-01";
 import { resolveOpsRegion } from "@/lib/regions";
 import type { FeedHealth, IncidentEvent } from "@/lib/schema";
@@ -29,6 +30,7 @@ function rollup(
 export type LoadOpsIncidentDeps = {
   firms?: FirmsFetchDeps;
   wind?: WindFetchDeps;
+  agents?: AgentRuntimeDeps;
 };
 
 /**
@@ -53,11 +55,16 @@ export async function loadOpsIncident(
     fetchWindTicks(ingestRegion, deps.wind),
   ]);
 
-  const agents = await runAllAgents({
-    incidentId: region.incidentId,
-    hotspots: firms.hotspots,
-    wind: wind.wind,
-  });
+  const agents = await runAllAgents(
+    {
+      incidentId: region.incidentId,
+      incidentEventId: region.incidentEventId,
+      regionName: region.name,
+      hotspots: firms.hotspots,
+      wind: wind.wind,
+    },
+    deps.agents,
+  );
 
   const crowdHealth = base.feedHealth.feeds.find((f) => f.id === "crowd") ?? {
     id: "crowd" as const,
@@ -92,6 +99,16 @@ export async function loadOpsIncident(
       { ...crowdHealth, detail: `${PUBLIC_CROWD_COPY} · ${crowd.redactions} fields redacted` },
       rfHealth,
     ]),
+    timeline: base.timeline.map((item) => {
+      if (item.kind !== "agent") return item;
+      const resource = agents.agents.find((a) => a.agentId === "resource-allocation");
+      return {
+        ...item,
+        at: resource?.producedAt ?? item.at,
+        sourceEventId: resource?.eventId ?? item.sourceEventId,
+        detail: agents.health.detail,
+      };
+    }),
     updatedAt: new Date().toISOString(),
   };
 

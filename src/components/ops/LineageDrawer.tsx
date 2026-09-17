@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { AgentOutput } from "@/lib/schema";
 import type { OpsRole } from "@/lib/auth/roles";
-import { agentShortName } from "@/lib/ui/status";
+import { agentShortName, agentStatusClass, agentStatusLabel } from "@/lib/ui/status";
 
 export function LineageDrawer({
   agent,
@@ -31,8 +31,20 @@ export function LineageDrawer({
       <div className="ops-scroll flex-1 space-y-3 overflow-y-auto px-4 py-3 text-[12px]">
         <p className="font-mono text-[11px] text-[#3DB9FF]">{agent.eventId}</p>
         <p className="text-[11px] text-[#8B9BB8]">
-          Lineage cites NASA FIRMS hotspots and WeatherNext wind (Experimental).
+          Lineage cites the same NASA FIRMS hotspot and WeatherNext wind eventIds
+          the map is plotting (Experimental wind).
         </p>
+        {agent.degraded ? (
+          <p className="rounded border border-[#FF5C5C]/40 bg-[#FF5C5C]/10 px-2 py-1 text-[11px] text-[#FF5C5C]">
+            Live Modal/LLM failed — fixture text in use. Confidence is capped so
+            this is not a silent live score.
+          </p>
+        ) : null}
+        {agent.model.used === "fixture" && !agent.degraded ? (
+          <p className="rounded border border-[#FFB020]/40 bg-[#FFB020]/10 px-2 py-1 text-[11px] text-[#FFB020]">
+            Fixture agent — no OPENAI_API_KEY / DEEPSEEK_API_KEY / MODAL_ENDPOINT.
+          </p>
+        ) : null}
         <div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
             Inputs
@@ -51,7 +63,11 @@ export function LineageDrawer({
             Model
           </div>
           <p className="mt-1">
-            OpenAI (primary) / DeepSeek (backup) · used {agent.model.used} · {agent.model.runtime}
+            OpenAI (primary) / DeepSeek (backup) · used {agent.model.used} ·{" "}
+            {agent.model.runtime}
+          </p>
+          <p className={`mt-1 font-mono text-[11px] ${agentStatusClass(agentStatusLabel(agent))}`}>
+            {agentStatusLabel(agent)} · {agent.producedAt.replace(".000Z", "Z")}
           </p>
         </div>
         <div>
