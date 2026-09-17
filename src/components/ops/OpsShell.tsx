@@ -7,7 +7,11 @@ import { parseIncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
 import type { RegionId } from "@/lib/regions";
 import { isFeedUnhealthy } from "@/lib/ui/status";
-import { withBasePath } from "@/lib/base-path";
+import {
+  opsIncidentUrl,
+  opsRegionHref,
+  withBasePath,
+} from "@/lib/base-path";
 import { TopBar } from "./TopBar";
 import { RightRail } from "./RightRail";
 import { LineageDrawer } from "./LineageDrawer";
@@ -21,6 +25,17 @@ const OpsMap = dynamic(() => import("./OpsMap").then((m) => m.OpsMap), {
     </div>
   ),
 });
+
+function rememberRegionInUrl(regionId: RegionId) {
+  if (typeof window === "undefined") return;
+  const next = opsRegionHref(regionId, window.location.href);
+  window.history.replaceState(null, "", next);
+}
+
+function hardNavigateToRegion(regionId: RegionId) {
+  if (typeof window === "undefined") return;
+  window.location.assign(opsRegionHref(regionId, window.location.href));
+}
 
 export function OpsShell({
   incident: initialIncident,
@@ -41,17 +56,22 @@ export function OpsShell({
     if (regionId === incident.region.id || switching) return;
     setSwitching(true);
     try {
-      const res = await fetch(
-        withBasePath(`/api/ops/incident?region=${encodeURIComponent(regionId)}`),
-        { cache: "no-store" },
-      );
-      if (!res.ok) {
+      const res = await fetch(opsIncidentUrl(regionId), {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!res.ok || !contentType.includes("json")) {
         throw new Error(`incident HTTP ${res.status}`);
       }
       const next = parseIncidentEvent(await res.json());
       setIncident(next);
+      rememberRegionInUrl(regionId);
     } catch {
-      // Keep the current snapshot so Ops never blanks on a failed remap.
+      // Fetch under a missing basePath 404s on the Worker; hard-navigate so
+      // the RSC page reloads ?region= under /aegisflow instead of staying put.
+      hardNavigateToRegion(regionId);
     } finally {
       setSwitching(false);
     }

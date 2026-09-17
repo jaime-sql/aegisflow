@@ -51,3 +51,5 @@ GET /api/ops/incident?region=cascade
 ```
 
 Unknown `region` values fall back to El Salvador / WUI.
+
+Client `fetch` of that API **must** keep the `/aegisflow` prefix on the Worker. Next.js does not inline `process.env` as an object in the browser, so a helper that reads `env.NEXT_PUBLIC_BASE_PATH` after `env = process.env` would request `/api/ops/incident` (OpenNext 404) and the picker would appear stuck on El Salvador. `withBasePath()` / `opsIncidentUrl()` read `process.env.NEXT_PUBLIC_BASE_PATH` as a direct member expression and also infer `/aegisflow` from the current pathname. Failed fetches hard-navigate to `/aegisflow/ops?region=` (never apex `/`).

@@ -183,16 +183,24 @@ function uiWiring() {
   assert.match(top, /OPS_REGION_OPTIONS/);
   assert.match(top, /onRegionChange/);
   assert.match(top, /FirmsVerifyButton/);
+  assert.match(top, /method="get"/);
+  assert.match(top, /name="region"/);
+  assert.match(top, /withBasePath\("\/ops"\)/);
+  assert.doesNotMatch(top, /action="\/ops"/);
   assert.doesNotMatch(top, /defaultValue=\{incident\.incidentId\}/);
   const regionsSrc = readFileSync("src/lib/regions.ts", "utf8");
   assert.match(regionsSrc, /El Salvador \/ WUI/);
   assert.match(regionsSrc, /Cascade \(AegisFire-01\)/);
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
-  assert.match(shell, /\/api\/ops\/incident\?region=/);
+  assert.match(shell, /opsIncidentUrl/);
+  assert.match(shell, /opsRegionHref/);
+  assert.match(shell, /location\.assign/);
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);
   assert.match(shell, /setIncident/);
+  assert.doesNotMatch(shell, /router\.push/);
+  assert.doesNotMatch(shell, /router\.replace/);
 
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /drawIncidentLayers/);
