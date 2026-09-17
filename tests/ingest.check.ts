@@ -314,7 +314,9 @@ async function loadIncidentFixtureFallback() {
     for (const key of ENV_KEYS) delete process.env[key];
     const incident = await loadOpsIncident();
     parseIncidentEvent(incident);
-    assert.equal(incident.eventId, "evt_aegisfire01_incident");
+    assert.equal(incident.region.id, "el-salvador");
+    assert.equal(incident.incidentId, "SV-WUI");
+    assert.equal(incident.eventId, "evt_svwui_incident");
     assert.equal(incident.schemaVersion, "1.0.0");
     assert.ok(incident.hotspots.length > 0);
     assert.ok(incident.wind.length > 0);
@@ -354,6 +356,12 @@ function uiWiring() {
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);
+  const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
+  assert.match(top, /OPS_REGION_OPTIONS/);
+  assert.match(top, /onRegionChange/);
+  const regions = readFileSync("src/lib/regions.ts", "utf8");
+  assert.match(regions, /El Salvador \/ WUI/);
+  assert.match(regions, /Cascade \(AegisFire-01\)/);
   const summary = readFileSync("src/components/ops/ExecSummaryCard.tsx", "utf8");
   assert.match(summary, /WeatherNext/);
   const lineage = readFileSync("src/components/ops/LineageDrawer.tsx", "utf8");

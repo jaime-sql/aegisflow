@@ -21,7 +21,7 @@ Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citi
 | IDs | Shared `eventId` + `schemaVersion` for Ops **and** a future Fabric twin. See [`docs/event-schema.md`](docs/event-schema.md). |
 | RF / mesh | Labeled **SIM** only. No live RF. |
 
-Demo region is a **Cascade Range / Sisters / Hwy 20 placeholder** until Jaime picks the contest narrative.
+Demo region **defaults to El Salvador / WUI**. Cascade (AegisFire-01) stays selectable from the TopBar region control (same map, in-place remap). Bbox: [`docs/regions.md`](docs/regions.md).
 
 ### Notion
 
@@ -48,7 +48,7 @@ npm test
 python3 workers/modal_stub.py
 ```
 
-Without API keys, Ops loads the **AegisFire-01** fixture (map, exec summary, lineage chips, dispatch, resource bars, timeline).
+Without API keys, Ops loads the **AegisFire-01** fixture remapped into the **El Salvador / WUI** bbox (map, exec summary, lineage chips, dispatch, resource bars, timeline). Switch the TopBar to Cascade to see native Sisters / Hwy 20 coordinates.
 
 | Check | URL |
 | --- | --- |
@@ -56,7 +56,8 @@ Without API keys, Ops loads the **AegisFire-01** fixture (map, exec summary, lin
 | Viewer (bypass) | http://localhost:3000/ops?role=viewer |
 | Clerk sign-in | http://localhost:3000/sign-in |
 | Fabric twin (same IDs, no map) | http://localhost:3000/fabric |
-| Incident JSON | http://localhost:3000/api/ops/incident |
+| Incident JSON | http://localhost:3000/api/ops/incident (default El Salvador / WUI) |
+| Cascade incident JSON | http://localhost:3000/api/ops/incident?region=cascade |
 
 ## Clerk roles
 
@@ -106,7 +107,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. Prod paths are `/aegisflow/sign-in` etc. |
 | `BASE_PATH` / `CLOUDFLARE_PROD` | Prod `basePath` / `assetPrefix` = `/aegisflow`. Unset locally. |
 | `AEGISFLOW_ORIGIN` | Path Worker only. Service-bind dest = OpenNext `workers.dev` origin (never the inbound Host). |
-| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots. Wrangler secret on Worker `aegisflow`. |
+| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots remapped into the selected bbox. Wrangler secret on Worker `aegisflow`. |
 | `GCP_SA_JSON` | GCP service-account JSON for project `aegisflow-ieee-quest`. Empty → fixture wind. Wrangler secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
@@ -122,10 +123,12 @@ src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lin
 src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/base-path.ts     env-driven `/aegisflow` prefix
 src/lib/ingest/          firms.ts · wind.ts (WeatherNext BigQuery) · weathernext.ts
+src/lib/regions.ts       El Salvador / WUI (default) + Cascade catalog
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
 src/lib/pii.ts           crowdsource scrubber
 fixtures/aegisfire-01.json
 docs/event-schema.md
+docs/regions.md
 docs/weathernext.md
 workers/modal_stub.py
 workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
@@ -217,7 +220,7 @@ This is **not** a missing R2 cache binding and **not** the path Worker stripping
 
 ## IEEE originality
 
-AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, wind, and agent payloads are synthetic fixtures for the Cascade Range placeholder.
+AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, wind, and agent payloads are synthetic fixtures (Cascade AegisFire-01), remapped into the El Salvador / WUI bbox when live keys are missing.
 
 ## Secrets
 
