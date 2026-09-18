@@ -8,6 +8,7 @@
 import { default as handler } from "./.open-next/worker.js";
 import {
   ingestEnvFromWorker,
+  logWindCacheRefresh,
   refreshPickerRegionWindCache,
 } from "./src/lib/ingest/wind";
 
@@ -16,6 +17,7 @@ export default {
 
   /**
    * Background refresh for El Salvador / WUI + Cascade only.
+   * Uses the long BigQuery budget (not the judge-click fail-fast).
    * Local: wrangler dev --test-scheduled then GET /__scheduled?cron=* * * * *
    */
   async scheduled(controller, env, ctx) {
@@ -27,14 +29,11 @@ export default {
       kv: env.WIND_CACHE,
       env: ingestEnvFromWorker(env),
     });
-    console.log(
-      JSON.stringify({
-        msg: "weathernext_cache_refresh",
-        cron: controller.cron,
-        scheduledTime: controller.scheduledTime,
-        results,
-      }),
-    );
+    logWindCacheRefresh(results, {
+      trigger: "cron",
+      cron: controller.cron,
+      scheduledTime: controller.scheduledTime,
+    });
     void ctx;
   },
 };

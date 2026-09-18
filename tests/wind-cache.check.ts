@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fetchWindTicks, queryLiveWindTicks, refreshPickerRegionWindCache } from "../src/lib/ingest/wind";
+import { fetchWindTicks, queryLiveWindTicks, refreshPickerRegionWindCache, windCacheRefreshLogPayload } from "../src/lib/ingest/wind";
+import {
+  BQ_CRON_BUDGET_MS,
+  BQ_CRON_JOB_WAIT_MS,
+  BQ_CRON_MAX_POLLS,
+  BQ_CRON_SQL_DEPS,
+  BQ_JOB_WAIT_MS,
+  BQ_MAX_BYTES_BILLED,
+  BQ_MAX_POLLS,
+  BQ_WORKER_BUDGET_MS,
+} from "../src/lib/ingest/bigquery";
+import { resetGcpTokenCache } from "../src/lib/ingest/gcp-auth";
+import type { GcpServiceAccount } from "../src/lib/ingest/gcp-auth";
 import {
   WIND_CACHE_CRON,
   WIND_CACHE_FRESH_MS,
@@ -319,6 +331,181 @@ function windChipHonesty() {
   assert.equal(windChipDisplay("down", live), "Offline");
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function liveBqPayload(jobComplete = true) {
+  return {
+    jobComplete,
+    jobReference: {
+      projectId: "aegisflow-ieee-quest",
+      jobId: "job_cron_wind",
+      location: "US",
+    },
+    schema: {
+      fields: [
+        { name: "lat" },
+        { name: "lon" },
+        { name: "forecast_time" },
+        { name: "speed_mps" },
+        { name: "gust_mps" },
+        { name: "u" },
+        { name: "v" },
+      ],
+    },
+    rows: [
+      {
+        f: [
+          { v: "13.69" },
+          { v: "-89.22" },
+          { v: "1768000000" },
+          { v: "9.6" },
+          { v: "14.2" },
+          { v: "8.1" },
+          { v: "5.2" },
+        ],
+      },
+    ],
+  };
+}
+
+async function testServiceAccount(): Promise<GcpServiceAccount> {
+  const pair = await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"],
+  );
+  const pkcs8 = await crypto.subtle.exportKey("pkcs8", pair.privateKey);
+  const b64 = Buffer.from(pkcs8).toString("base64");
+  const wrapped = b64.match(/.{1,64}/g)?.join("\n") ?? b64;
+  return {
+    client_email: "ingest-ci@aegisflow-ieee-quest.iam.gserviceaccount.com",
+    private_key: `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----\n`,
+    project_id: "aegisflow-ieee-quest",
+  };
+}
+
+function cronBudgetConstants() {
+  assert.equal(BQ_CRON_BUDGET_MS, 90_000);
+  assert.equal(BQ_CRON_JOB_WAIT_MS, 20_000);
+  assert.equal(BQ_CRON_MAX_POLLS, 5);
+  assert.ok(BQ_CRON_BUDGET_MS > BQ_WORKER_BUDGET_MS);
+  assert.ok(BQ_CRON_JOB_WAIT_MS > BQ_JOB_WAIT_MS);
+  assert.ok(BQ_CRON_MAX_POLLS > BQ_MAX_POLLS);
+  assert.equal(BQ_CRON_SQL_DEPS.budgetMs, BQ_CRON_BUDGET_MS);
+  assert.equal(BQ_CRON_SQL_DEPS.jobWaitMs, BQ_CRON_JOB_WAIT_MS);
+  assert.equal(BQ_CRON_SQL_DEPS.maxPolls, BQ_CRON_MAX_POLLS);
+}
+
+async function refreshUsesLongerBigQueryBudget() {
+  resetGcpTokenCache();
+  const sa = await testServiceAccount();
+  const kv = memoryWindKv();
+  const timeoutMs: number[] = [];
+  let polls = 0;
+  const doFetch: IngestFetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes("oauth2.googleapis.com")) {
+      return jsonResponse({ access_token: "ya29.cron-token", expires_in: 3600 });
+    }
+    if (url.includes("/queries/job_cron_wind")) {
+      polls += 1;
+      // Short request budget (maxPolls=1) would throw before poll 3.
+      if (polls >= 3) return jsonResponse(liveBqPayload(true));
+      return jsonResponse({
+        jobComplete: false,
+        jobReference: liveBqPayload(false).jobReference,
+      });
+    }
+    if (url.includes("bigquery.googleapis.com") && url.endsWith("/queries")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        timeoutMs?: number;
+        maximumBytesBilled?: string;
+      };
+      timeoutMs.push(body.timeoutMs ?? -1);
+      assert.equal(body.timeoutMs, BQ_CRON_JOB_WAIT_MS);
+      assert.equal(body.maximumBytesBilled, BQ_MAX_BYTES_BILLED);
+      return jsonResponse({
+        ...liveBqPayload(false),
+        rows: undefined,
+        schema: undefined,
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const results = await refreshPickerRegionWindCache({
+    kv,
+    env: { GCP_SA_JSON: JSON.stringify(sa) },
+    fetch: doFetch,
+  });
+  assert.ok(timeoutMs.length >= 1);
+  assert.ok(timeoutMs.every((ms) => ms === BQ_CRON_JOB_WAIT_MS));
+  assert.ok(polls >= 3, `refresh must allow more than one poll (got ${polls})`);
+  assert.equal(results.length, 2);
+  assert.ok(results.every((r) => r.ok && r.cells === 1));
+  assert.ok(parseWindCacheEntry(await kv.get("wind:el-salvador")));
+  assert.ok(parseWindCacheEntry(await kv.get("wind:cascade")));
+}
+
+async function clickPathNeverCallsBigQueryWhenKvBound() {
+  const kv = memoryWindKv();
+  let bqHits = 0;
+  const result = await fetchWindTicks(CASCADE, {
+    kv,
+    env: {
+      GCP_SA_JSON: '{"client_email":"x@y"}',
+      CLOUDFLARE_PROD: "true",
+    },
+    fetch: async (input) => {
+      bqHits += 1;
+      throw new Error(`click path hit network ${String(input)}`);
+    },
+    client: {
+      async queryWind() {
+        throw new Error("click path must not query BigQuery");
+      },
+    },
+    bigQuery: BQ_CRON_SQL_DEPS,
+  });
+  assert.equal(bqHits, 0, "judge click path must not run BigQuery when KV is bound");
+  assert.equal(result.usedFixture, true);
+  assert.equal(result.fromCache, false);
+  assert.equal(result.health.detail, WIND_FALLBACK_DETAIL);
+}
+
+function refreshLogIncludesOkErrorPerRegion() {
+  const payload = windCacheRefreshLogPayload(
+    [
+      { regionId: "el-salvador", ok: true, cells: 8, elapsedMs: 1200 },
+      {
+        regionId: "cascade",
+        ok: false,
+        cells: 0,
+        error: "weathernext_job_timeout",
+        elapsedMs: 90_100,
+      },
+    ],
+    { trigger: "cron", cron: "*/8 * * * *" },
+  );
+  assert.equal(payload.msg, "weathernext_cache_refresh");
+  assert.equal(payload.trigger, "cron");
+  assert.equal(payload.ok, false);
+  assert.equal(payload.results[0]?.ok, true);
+  assert.equal(payload.results[0]?.error, null);
+  assert.equal(payload.results[1]?.ok, false);
+  assert.equal(payload.results[1]?.error, "weathernext_job_timeout");
+}
+
 function wranglerAndWorkflowWiring() {
   const wrangler = readFileSync("wrangler.jsonc", "utf8");
   assert.match(wrangler, /"main": "cloudflare-worker\.ts"/);
@@ -329,7 +516,16 @@ function wranglerAndWorkflowWiring() {
   const worker = readFileSync("cloudflare-worker.ts", "utf8");
   assert.match(worker, /async scheduled\(/);
   assert.match(worker, /refreshPickerRegionWindCache/);
+  assert.match(worker, /logWindCacheRefresh/);
+  assert.match(worker, /trigger: "cron"/);
   assert.match(worker, /\.open-next\/worker\.js/);
+  const refreshSrc = readFileSync("src/lib/ingest/wind.ts", "utf8");
+  assert.match(refreshSrc, /BQ_CRON_SQL_DEPS/);
+  assert.match(refreshSrc, /deps\.bigQuery \?\? BQ_CRON_SQL_DEPS/);
+  const route = readFileSync("src/app/api/ops/wind-cache-refresh/route.ts", "utf8");
+  assert.match(route, /refreshPickerRegionWindCache/);
+  assert.match(route, /trigger: "admin"/);
+  assert.doesNotMatch(route, /loadOpsIncident/);
   const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
   assert.match(workflow, /ensure-wind-cache-kv\.mjs/);
   assert.match(workflow, /npx wrangler kv namespace create WIND_CACHE/);
@@ -343,13 +539,17 @@ function wranglerAndWorkflowWiring() {
 
 async function main() {
   await catalogKeys();
+  cronBudgetConstants();
   await parseRejectsGarbage();
   await cacheHitIsLiveCyan();
   await cacheMissIsHonestFallback();
+  await clickPathNeverCallsBigQueryWhenKvBound();
   await staleCacheFallsBack();
   await unboundKvSkipsWithoutBigQuery();
   await refreshWritesBothPickerRegionsOnly();
+  await refreshUsesLongerBigQueryBudget();
   await refreshFailureDoesNotClobberCache();
+  refreshLogIncludesOkErrorPerRegion();
   await queryLiveKeepsSqlDiscipline();
   await loadIncidentCacheHit();
   await loadIncidentCacheMissStaysUp();

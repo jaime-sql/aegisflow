@@ -1,6 +1,6 @@
 import type { IngestFetch } from "./types";
 
-/** Total wall budget for jobs.query + polls (under a ~30s Worker request). */
+/** Total wall budget for jobs.query + polls (legacy request-path fail-fast). */
 export const BQ_WORKER_BUDGET_MS = 22_000;
 
 /** How long each BigQuery REST call waits for the job (`timeoutMs`). */
@@ -11,6 +11,33 @@ export const BQ_HTTP_BUFFER_MS = 2_000;
 
 /** One getQueryResults poll after an incomplete jobs.query, then fail fast. */
 export const BQ_MAX_POLLS = 1;
+
+/**
+ * Cron / refresh wall budget. Scheduled Workers allow 15 min; ~90s per
+ * picker region leaves headroom for El Salvador + Cascade sequentially.
+ * Ops / judge clicks never use this — they are KV-only.
+ */
+export const BQ_CRON_BUDGET_MS = 90_000;
+
+/** Per jobs.query / getQueryResults wait on the refresh path. */
+export const BQ_CRON_JOB_WAIT_MS = 20_000;
+
+/** Extra getQueryResults polls on cron (20s × 5 + first wait, capped by budget). */
+export const BQ_CRON_MAX_POLLS = 5;
+
+/** Defaults `runBigQuerySql` uses unless the caller overrides. */
+export const BQ_REQUEST_SQL_DEPS = {
+  budgetMs: BQ_WORKER_BUDGET_MS,
+  jobWaitMs: BQ_JOB_WAIT_MS,
+  maxPolls: BQ_MAX_POLLS,
+} as const;
+
+/** Longer wait used only by `refreshPickerRegionWindCache`. */
+export const BQ_CRON_SQL_DEPS = {
+  budgetMs: BQ_CRON_BUDGET_MS,
+  jobWaitMs: BQ_CRON_JOB_WAIT_MS,
+  maxPolls: BQ_CRON_MAX_POLLS,
+} as const;
 
 export const BQ_MAX_RESULTS = 48;
 
@@ -134,8 +161,8 @@ async function bqFetchJson(
 }
 
 /**
- * jobs.query + at most one getQueryResults poll. Incomplete jobs throw
- * `BigQueryIncompleteJobError` instead of hanging on the Worker.
+ * jobs.query + getQueryResults polls until complete, budget, or maxPolls.
+ * Request-path defaults fail fast (~12s + 1 poll). Cron passes `BQ_CRON_SQL_DEPS`.
  */
 export async function runBigQuerySql(
   sql: string,
