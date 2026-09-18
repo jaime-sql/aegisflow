@@ -1,5 +1,5 @@
 import type { FeedComponent, WindTick } from "@/lib/schema";
-import type { FeedDisplay } from "@/lib/ui/status";
+import { feedDisplay, type FeedDisplay } from "@/lib/ui/status";
 
 /** Judge-facing degrade line — never interpolate BigQuery / timeout internals. */
 export const WIND_FALLBACK_DETAIL = "Wind · fallback";
@@ -23,17 +23,25 @@ export function isLiveWeatherNextWind(
   return source === "WEATHERNEXT";
 }
 
+/**
+ * Wind feed chrome (dot + label). LIVE / ok only when cells are WEATHERNEXT.
+ * Fixture · MOCK_WIND · IOT_WIND · empty / ok-without-WEATHERNEXT → degraded.
+ */
+export function windChipFeedStatus(
+  status: FeedComponent["status"],
+  wind: Array<Pick<WindTick, "source">>,
+): FeedComponent["status"] {
+  if (status === "down") return "down";
+  if (status === "ok" && wind.some((w) => isLiveWeatherNextWind(w))) return "ok";
+  return "degraded";
+}
+
 /** TopBar chip: LIVE only when cached WEATHERNEXT cells are on the incident. */
 export function windChipDisplay(
   status: FeedComponent["status"],
   wind: Array<Pick<WindTick, "source">>,
 ): FeedDisplay {
-  if (status === "down") return "Offline";
-  if (wind.some((w) => isLiveWeatherNextWind(w)) && status === "ok") {
-    return "Live";
-  }
-  if (status === "ok") return "Live";
-  return "Degraded";
+  return feedDisplay(windChipFeedStatus(status, wind));
 }
 
 export function windOverlayColor(

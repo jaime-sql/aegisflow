@@ -30,6 +30,7 @@ import {
   WIND_OFFLINE_DETAIL,
   isLiveWeatherNextWind,
   publicWindBannerDetail,
+  windChipDisplay,
   windOverlayColor,
 } from "../src/lib/ui/wind-feed";
 import type { IngestEnv, IngestFetch } from "../src/lib/ingest/types";
@@ -171,6 +172,8 @@ async function windFixture() {
   assert.equal(result.health.label, "WeatherNext");
   assert.match(result.health.detail, /no GCP_SA_JSON/);
   assert.equal(result.wind[0]?.source, "MOCK_WIND");
+  assert.notEqual(windChipDisplay(result.health.status, result.wind), "Live");
+  assert.equal(windChipDisplay(result.health.status, result.wind), "Degraded");
 }
 
 async function windLiveClient() {
@@ -584,6 +587,7 @@ function uiWiring() {
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /publicWindBannerDetail/);
   assert.match(top, /windChipDisplay/);
+  assert.match(top, /windChipFeedStatus/);
   assert.match(top, /FirmsVerifyButton/);
   assert.doesNotMatch(top, /disabled=/);
   assert.doesNotMatch(top, /onRegionChange/);

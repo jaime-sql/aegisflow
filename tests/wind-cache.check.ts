@@ -202,6 +202,8 @@ async function unboundKvSkipsWithoutBigQuery() {
   assert.equal(result.health.status, "ok");
   assert.match(result.health.detail, /no GCP_SA_JSON/);
   assert.equal(result.wind[0]?.source, "MOCK_WIND");
+  assert.notEqual(windChipDisplay(result.health.status, result.wind), "Live");
+  assert.equal(windChipDisplay(result.health.status, result.wind), "Degraded");
 }
 
 async function refreshWritesBothPickerRegionsOnly() {
@@ -305,6 +307,18 @@ async function loadIncidentCacheMissStaysUp() {
   assert.equal(windFeed?.detail, WIND_FALLBACK_DETAIL);
 }
 
+function windChipHonesty() {
+  const fixture = [{ source: "MOCK_WIND" as const }];
+  const live = [{ source: "WEATHERNEXT" as const }];
+  assert.equal(windChipDisplay("ok", live), "Live");
+  assert.equal(windChipDisplay("ok", fixture), "Degraded");
+  assert.notEqual(windChipDisplay("ok", fixture), "Live");
+  assert.equal(windChipDisplay("ok", [{ source: "IOT_WIND" }]), "Degraded");
+  assert.equal(windChipDisplay("ok", []), "Degraded");
+  assert.equal(windChipDisplay("degraded", live), "Degraded");
+  assert.equal(windChipDisplay("down", live), "Offline");
+}
+
 function wranglerAndWorkflowWiring() {
   const wrangler = readFileSync("wrangler.jsonc", "utf8");
   assert.match(wrangler, /"main": "cloudflare-worker\.ts"/);
@@ -321,6 +335,7 @@ function wranglerAndWorkflowWiring() {
   assert.match(workflow, /npx wrangler kv namespace create WIND_CACHE/);
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /windChipDisplay/);
+  assert.match(top, /windChipFeedStatus/);
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /windOverlayColor/);
   assert.match(map, /isLiveWeatherNextWind/);
@@ -338,6 +353,7 @@ async function main() {
   await queryLiveKeepsSqlDiscipline();
   await loadIncidentCacheHit();
   await loadIncidentCacheMissStaysUp();
+  windChipHonesty();
   wranglerAndWorkflowWiring();
   console.log("OK  WeatherNext wind KV cache (picker regions, request path cache-only)");
 }
