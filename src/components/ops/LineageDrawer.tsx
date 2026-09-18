@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { AgentOutput } from "@/lib/schema";
 import type { OpsRole } from "@/lib/auth/roles";
-import { agentShortName } from "@/lib/ui/status";
+import { agentIsSim, agentShortName } from "@/lib/ui/status";
+import { SimBadge } from "./SimBadge";
 
 export function LineageDrawer({
   agent,
@@ -14,11 +15,13 @@ export function LineageDrawer({
   role: OpsRole;
   onClose: () => void;
 }) {
+  const stub = agentIsSim(agent);
   return (
     <aside className="absolute inset-y-0 right-0 z-[600] flex w-[400px] max-w-full flex-col border-l border-[#1E2A40] bg-[#121A2B] shadow-2xl">
       <div className="flex items-center justify-between border-b border-[#1E2A40] px-4 py-3">
-        <h2 className="text-sm font-semibold">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
           Lineage — Agent · {agentShortName(agent.agentId)}
+          {stub ? <SimBadge /> : null}
         </h2>
         <button
           type="button"
@@ -31,7 +34,8 @@ export function LineageDrawer({
       <div className="ops-scroll flex-1 space-y-3 overflow-y-auto px-4 py-3 text-[12px]">
         <p className="font-mono text-[11px] text-[#3DB9FF]">{agent.eventId}</p>
         <p className="text-[11px] text-[#8B9BB8]">
-          Lineage cites NASA FIRMS hotspots and WeatherNext wind (Experimental).
+          Lineage cites the same NASA FIRMS hotspot and WeatherNext wind eventIds
+          the map is plotting (Experimental wind).
         </p>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
@@ -51,7 +55,13 @@ export function LineageDrawer({
             Model
           </div>
           <p className="mt-1">
-            OpenAI (primary) / DeepSeek (backup) · used {agent.model.used} · {agent.model.runtime}
+            OpenAI (primary) / DeepSeek (backup) · used {agent.model.used} ·{" "}
+            {agent.model.runtime}
+            {stub ? " · stub" : ""}
+          </p>
+          <p className="mt-1 font-mono text-[11px] text-[#8B9BB8]">
+            {agent.producedAt.replace(".000Z", "Z")}
+            {agent.degraded ? " · live call failed, stub in use" : ""}
           </p>
         </div>
         <div>
@@ -59,7 +69,7 @@ export function LineageDrawer({
             Output
           </div>
           <p className="mt-1 font-mono text-[11px]">
-            {agent.outputHash} · {agent.producedAt.replace(".000Z", "Z")}
+            {agent.outputHash} · conf {agent.confidence.toFixed(2)}
           </p>
           <p className="mt-2 leading-relaxed text-[#8B9BB8]">{agent.summary}</p>
         </div>

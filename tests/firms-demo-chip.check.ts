@@ -120,8 +120,14 @@ function feedBannerUnchanged() {
 }
 
 async function ingestFixtureVsLive() {
-  const esFixture = await loadOpsIncident("el-salvador", { firms: { env: {} } });
-  const cascadeFixture = await loadOpsIncident("cascade", { firms: { env: {} } });
+  const esFixture = await loadOpsIncident("el-salvador", {
+    firms: { env: {} },
+    agents: { env: {} },
+  });
+  const cascadeFixture = await loadOpsIncident("cascade", {
+    firms: { env: {} },
+    agents: { env: {} },
+  });
   parseIncidentEvent(esFixture);
   parseIncidentEvent(cascadeFixture);
   assert.equal(isFirmsDemoFixture(esFixture), true);
@@ -137,9 +143,11 @@ async function ingestFixtureVsLive() {
   const doFetch: IngestFetch = async () => textResponse(LIVE_CSV);
   const esLive = await loadOpsIncident("el-salvador", {
     firms: { env: { FIRMS_MAP_KEY: "test-map-key" }, fetch: doFetch },
+    agents: { env: {} },
   });
   const cascadeLive = await loadOpsIncident("cascade", {
     firms: { env: { FIRMS_MAP_KEY: "test-map-key" }, fetch: doFetch },
+    agents: { env: {} },
   });
   assert.equal(isFirmsDemoFixture(esLive), false);
   assert.equal(isFirmsDemoFixture(cascadeLive), false);
@@ -151,6 +159,7 @@ async function ingestFixtureVsLive() {
       env: { FIRMS_MAP_KEY: "test-map-key" },
       fetch: async () => textResponse(ZERO_CSV),
     },
+    agents: { env: {} },
   });
   assert.equal(isFirmsDemoFixture(quietDay), true);
   assert.equal(quietDay.hotspots[0]?.source, "NASA_FIRMS_FIXTURE");
