@@ -114,8 +114,8 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions with a 90s BigQuery budget. Ops reads cache only. Signed-in `GET /aegisflow/api/ops/wind-cache-refresh` is a one-shot fill. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | LLM router. Empty → fixture agents (CI). Live: OpenAI primary, DeepSeek backup. See [`docs/agents.md`](docs/agents.md). |
 | `MODAL_ENDPOINT` / `MODAL_TOKEN_*` | Preferred agent host. Empty → local LLM or fixture. Proxy-auth headers sent when tokens are set. |
-| `ELEVENLABS_API_KEY` | Manager **Brief aloud** (exec summary TTS). Empty → muted **SIM**. Wrangler secret. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
-| `ELEVENLABS_VOICE_ID` | Optional. Default Rachel `21m00Tcm4TlvDq8ikWAM`. Wrangler var — Jaime overrides from the ElevenLabs Voices dashboard. |
+| `ELEVENLABS_API_KEY` | Manager **Brief aloud** (exec summary TTS). Worker secret (Cloudflare Prod uploads the Actions secret). Empty → muted **SIM**. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
+| `ELEVENLABS_VOICE_ID` | Optional Worker secret. Default premade Rachel `21m00Tcm4TlvDq8ikWAM` (Jaime did not pick a voice). Override via Actions secret / Wrangler / `.env.local`. |
 | `AEGISFLOW_LIVE_LLM` | Set `false` to force fixture even if keys exist. |
 
 ## Repo layout
@@ -170,10 +170,10 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
      - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var.
      - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal proxy token. Wrangler secrets.
    - Optional **Brief aloud** (Manager exec-summary TTS; empty → muted SIM). See [`docs/brief-aloud.md`](docs/brief-aloud.md):
-     - `ELEVENLABS_API_KEY` — Wrangler secret. Expire-first credits; last clip cached per `eventId` in `WIND_CACHE` (`tts:` keys).
-     - Optional Wrangler var `ELEVENLABS_VOICE_ID` (default Rachel `21m00Tcm4TlvDq8ikWAM`).
+     - `ELEVENLABS_API_KEY` — Worker secret (Cloudflare Prod uploads the Actions secret). Expire-first credits; last clip cached per `eventId` in `WIND_CACHE` (`tts:` keys).
+     - `ELEVENLABS_VOICE_ID` — optional Worker secret. Default Rachel `21m00Tcm4TlvDq8ikWAM` if unset.
    - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
-4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys, ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON`, agent secrets `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_*`, and `ELEVENLABS_API_KEY` as Worker secrets; path, WeatherNext dataset, `DEEPSEEK_BASE_URL`, ElevenLabs voice/model, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys, ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON`, agent secrets `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_*`, and ElevenLabs `ELEVENLABS_API_KEY` / optional `ELEVENLABS_VOICE_ID` as Worker secrets; path, WeatherNext dataset, `DEEPSEEK_BASE_URL`, ElevenLabs model, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
    - If the KV step fails, the API token needs Workers KV edit, or Jaime runs `npx wrangler kv namespace create WIND_CACHE` once and pastes the id into `wrangler.jsonc`. See [`docs/weathernext.md`](docs/weathernext.md).
 5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
@@ -241,4 +241,4 @@ AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, w
 
 ## Secrets
 
-Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, ElevenLabs, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_TOKEN_SECRET` / `ELEVENLABS_API_KEY` belong.
+Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, ElevenLabs, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_TOKEN_SECRET` / `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` belong.

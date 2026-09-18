@@ -103,13 +103,14 @@ jobs:
           #   OPENAI_API_KEY / DEEPSEEK_API_KEY — LLM router (OpenAI primary, DeepSeek backup)
           #   MODAL_TOKEN_ID / MODAL_TOKEN_SECRET — Modal proxy auth
           #   ELEVENLABS_API_KEY — Manager Brief aloud (exec summary TTS). Empty → muted SIM.
+          #   ELEVENLABS_VOICE_ID — optional. Unset uses Rachel 21m00Tcm4TlvDq8ikWAM (documented default).
           # These are uploaded as Wrangler secrets on Worker `aegisflow`. Empty is OK;
           # adapters then serve fixtures and FeedBanner stays quiet unless a live call fails.
           # Optional: `npx wrangler secret put FIRMS_MAP_KEY` / `npx wrangler secret put GCP_SA_JSON`
           # Optional: `npx wrangler secret put OPENAI_API_KEY` (same for DEEPSEEK_API_KEY,
-          # MODAL_TOKEN_ID, MODAL_TOKEN_SECRET, ELEVENLABS_API_KEY). Set Wrangler var
-          # MODAL_ENDPOINT after `modal deploy workers/modal_stub.py`. See docs/agents.md
-          # and docs/brief-aloud.md.
+          # MODAL_TOKEN_ID, MODAL_TOKEN_SECRET, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID).
+          # Set Wrangler var MODAL_ENDPOINT after `modal deploy workers/modal_stub.py`.
+          # See docs/agents.md and docs/brief-aloud.md.
           # WIND_CACHE KV: scripts/ensure-wind-cache-kv.mjs binds `aegisflow-WIND_CACHE`.
           # If that step fails, Jaime: `npx wrangler kv namespace create WIND_CACHE`
           command: deploy
@@ -124,6 +125,7 @@ jobs:
             MODAL_TOKEN_SECRET
             MODAL_ENDPOINT
             ELEVENLABS_API_KEY
+            ELEVENLABS_VOICE_ID
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRD }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_PRD }}
@@ -135,6 +137,8 @@ jobs:
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
           MODAL_ENDPOINT: ${{ secrets.MODAL_ENDPOINT }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          # Jaime did not pick a voice. Rachel is the documented default; override via Actions secret.
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM' }}
 
       - name: Deploy path Worker
         uses: cloudflare/wrangler-action@v3

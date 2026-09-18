@@ -40,9 +40,9 @@ Never commit the key. Copy [`.env.example`](../.env.example) to `.env.local`.
 
 | Variable | Purpose |
 | --- | --- |
-| `ELEVENLABS_API_KEY` | Worker **secret**. Empty → muted SIM. Cloudflare Prod uploads GitHub Actions secret `ELEVENLABS_API_KEY`. Local: `npx wrangler secret put ELEVENLABS_API_KEY` or `.env.local`. |
-| `ELEVENLABS_VOICE_ID` | Wrangler **var** / `.env`. Default **Rachel** `21m00Tcm4TlvDq8ikWAM`. Override with any voice id from the [ElevenLabs Voices](https://elevenlabs.io/app/voice-library) dashboard. |
-| `ELEVENLABS_MODEL_ID` | Optional. Default `eleven_flash_v2_5`. |
+| `ELEVENLABS_API_KEY` | Worker **secret**. Cloudflare Prod uploads GitHub Actions secret `ELEVENLABS_API_KEY` onto Worker `aegisflow` (same list as Clerk / FIRMS / LLM keys). Empty → muted SIM. Local: `npx wrangler secret put ELEVENLABS_API_KEY` or `.env.local`. |
+| `ELEVENLABS_VOICE_ID` | Optional Worker **secret** (same Cloudflare Prod upload). Jaime did not pick a voice, so the default is premade **Rachel** `21m00Tcm4TlvDq8ikWAM` (calm, all-plan ElevenLabs voice; good for a short radio brief). Override with Actions secret `ELEVENLABS_VOICE_ID`, Wrangler var, or `.env.local`. Unset/empty still resolves to Rachel in code. |
+| `ELEVENLABS_MODEL_ID` | Optional Wrangler var. Default `eleven_flash_v2_5` (cheap/fast 15–30s clip). |
 
 CI unsets `ELEVENLABS_API_KEY`. Tests mock `fetch`. `npm test` must pass without an ElevenLabs account.
 
@@ -65,7 +65,7 @@ Local `next dev` uses an in-process map when KV is unbound.
 
 ## Jaime
 
-1. Create GitHub Actions secret `ELEVENLABS_API_KEY` on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow) (agents often lack `actions:write`).
-2. Optional voice override: set Wrangler var `ELEVENLABS_VOICE_ID` (or `.env.local` for `next dev`).
-3. Re-run **Actions → Cloudflare Prod** so the secret is uploaded to Worker `aegisflow`.
+1. GitHub Actions secret `ELEVENLABS_API_KEY` is already on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow). Cloudflare Prod **must** upload it as Worker secret `ELEVENLABS_API_KEY` on `aegisflow` (same `wrangler-action` `secrets:` list as the other keys).
+2. No preferred voice. Default is **Rachel** `21m00Tcm4TlvDq8ikWAM`. Optional override: Actions secret `ELEVENLABS_VOICE_ID` (also uploaded as a Worker secret) or Wrangler / `.env.local`. Browse ids in the [ElevenLabs Voices](https://elevenlabs.io/app/voice-library) dashboard.
+3. Re-run **Actions → Cloudflare Prod** so the Worker secrets land.
 4. Sign in as Manager on `/aegisflow/ops`. Exec summary shows **Brief aloud**. Viewer (`publicMetadata.role=viewer` or `/ops?role=viewer` in DEV bypass) must not show it.

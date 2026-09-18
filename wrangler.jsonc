@@ -43,8 +43,10 @@
   // Non-secret runtime env. OpenNext middleware / RSC read process.env here;
   // next.config.ts inlines the same values at build. Clerk keys, ingest
   // secrets (FIRMS_MAP_KEY, GCP_SA_JSON), agent secrets (OPENAI_API_KEY,
-  // DEEPSEEK_API_KEY, MODAL_*), and ELEVENLABS_API_KEY are Worker secrets —
-  // see cloudflare-prod.yml — not vars. ELEVENLABS_VOICE_ID is a var.
+  // DEEPSEEK_API_KEY, MODAL_*), ELEVENLABS_API_KEY, and optional
+  // ELEVENLABS_VOICE_ID are Worker secrets — see cloudflare-prod.yml.
+  // ELEVENLABS_VOICE_ID also has a documented default var (Rachel) used when
+  // the secret is unset. ELEVENLABS_MODEL_ID is a var.
   "vars": {
     "NEXTJS_ENV": "production",
     "CLOUDFLARE_PROD": "true",

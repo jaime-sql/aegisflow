@@ -11,7 +11,7 @@ export const TTS_CACHE_VERSION = 1 as const;
 /** 7 days — last clip per eventId; miss only when summary/voice changes. */
 export const TTS_CACHE_TTL_SEC = 7 * 24 * 60 * 60;
 
-/** Rachel — documented default. Jaime overrides with ELEVENLABS_VOICE_ID. */
+/** Premade Rachel (`21m00Tcm4TlvDq8ikWAM`) — documented default; Jaime did not pick a voice. Override with ELEVENLABS_VOICE_ID. */
 export const DEFAULT_ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 /** Flash is the cheap/fast model for a 15–30s radio clip. */
 export const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5";

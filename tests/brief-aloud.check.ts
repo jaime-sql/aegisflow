@@ -62,6 +62,8 @@ assert.equal(isElevenLabsConfigured({ ELEVENLABS_API_KEY: "" }), false);
 assert.equal(isElevenLabsConfigured({ ELEVENLABS_API_KEY: "  " }), false);
 assert.equal(isElevenLabsConfigured({ ELEVENLABS_API_KEY: "sk_test" }), true);
 assert.equal(resolveElevenLabsVoiceId({}), DEFAULT_ELEVENLABS_VOICE_ID);
+assert.equal(resolveElevenLabsVoiceId({ ELEVENLABS_VOICE_ID: "" }), DEFAULT_ELEVENLABS_VOICE_ID);
+assert.equal(resolveElevenLabsVoiceId({ ELEVENLABS_VOICE_ID: "  " }), DEFAULT_ELEVENLABS_VOICE_ID);
 assert.equal(
   resolveElevenLabsVoiceId({ ELEVENLABS_VOICE_ID: "customVoice" }),
   "customVoice",
@@ -310,7 +312,11 @@ function uiWiring() {
   assert.match(workflow, /ELEVENLABS_API_KEY/);
   assert.match(
     workflow,
-    /secrets: \|[\s\S]*ELEVENLABS_API_KEY/,
+    /secrets: \|[\s\S]*ELEVENLABS_API_KEY[\s\S]*ELEVENLABS_VOICE_ID/,
+  );
+  assert.match(
+    workflow,
+    /secrets\.ELEVENLABS_VOICE_ID \|\| '21m00Tcm4TlvDq8ikWAM'/,
   );
 
   const ci = readFileSync(".github/workflows/ci.yml", "utf8");
