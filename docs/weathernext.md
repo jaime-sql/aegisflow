@@ -53,23 +53,34 @@ type WeatherNextQueryClient = {
   queryWind(sql: string): Promise<WeatherNextWindRow[]>;
 };
 
-fetchWindTicks(region: { bbox: BBox; center: GeoPoint }, deps?: {
-  client?: WeatherNextQueryClient; // tests
-  fetch?: typeof fetch;            // mock HTTP
+// Ops / judge click path — KV only, never BigQuery
+fetchWindTicks(region: { id?: string; bbox: BBox; center: GeoPoint }, deps?: {
+  kv?: WindKv | null;
   env?: IngestEnv;
 }): Promise<WindResult>
+
+// Cron / refresh path — #14 SQL into KV
+refreshPickerRegionWindCache(deps: {
+  kv: WindKv;
+  client?: WeatherNextQueryClient; // tests
+  fetch?: typeof fetch;
+  env?: IngestEnv;
+}): Promise<WindRefreshResult[]>
 ```
 
-Live path: service-account JWT → `oauth2.googleapis.com/token` → BigQuery `jobs.query` REST (no `@google-cloud/bigquery`; that client is not Worker-friendly). The Ops SQL is scoped for the Worker budget:
+**Ops request path** reads Cloudflare KV keys `wind:el-salvador` and `wind:cascade` only. It never runs BigQuery mid-request (that is what hung the Worker before #14). Fresh cached cells (`source: "WEATHERNEXT"`, `refreshedAt` within 15 minutes) → cyan overlay + TopBar **Live**. Empty / stale / miss → existing honest fixture + FeedBanner `Degraded · Wind · fallback`. Raw BigQuery strings stay in Worker logs.
+
+**Background refresh** (OpenNext custom Worker `scheduled` handler, cron `*/8 * * * *` UTC): queries **both picker regions only** (El Salvador / WUI + Cascade). Same #14 SQL budget:
 
 - `init_time` lookback on **both** the latest-init CTE and the base table (partition prune; default 12 hours)
-- clustered `geography` intersected with the **active region bbox** (El Salvador / WUI by default)
+- clustered `geography` intersected with the **active region bbox**
 - lead hours `BETWEEN 1 AND 6` (nearest hour in that window)
 - `LIMIT 24` cells (map samples 16)
+- `jobs.query` waits ~12s, then **one** `getQueryResults` poll; incomplete jobs fail that region without hanging cron
 
-`jobs.query` waits ~12s, then **one** `getQueryResults` poll. If the job is still running, the adapter fails fast to the fixture (does not hang the Worker). Rows map to `WindTick` (`source: "WEATHERNEXT"`, `schemaVersion: 1.0.0`, `eventId` prefix `evt_aegisfire01_wn_`). Cyan overlay + TopBar **Live** are only used when this query finishes.
+Cost: 2 regions × ~7.5 refreshes/hour ≈ **12–16 small queries/hour**, not one query per Ops load. Failed refreshes leave the previous KV value in place (no empty overwrite). World-wide regions are out of scope.
 
-Missing `GCP_SA_JSON` → AegisFire-01 fixture, feed `ok`. Query/auth/timeout or 0 cells → fixture + FeedBanner (`Degraded · Wind · fallback`) plus the existing WeatherNext **Experimental** chip. Raw BigQuery timeout strings are never shown. `AEGISFLOW_FAIL_WIND=true` → empty vectors + `down` (test hook). Force fixture even with creds: `AEGISFLOW_USE_WEATHERNEXT_FIXTURE=true`.
+Local / CI / KV unbound: skip gracefully to the AegisFire-01 fixture (`ok`, live skipped). `AEGISFLOW_FAIL_WIND=true` → empty vectors + `down`. Force skip even with creds: `AEGISFLOW_USE_WEATHERNEXT_FIXTURE=true`.
 
 ## Jaime — enable live wind
 
@@ -79,11 +90,20 @@ Missing `GCP_SA_JSON` → AegisFire-01 fixture, feed `ok`. Query/auth/timeout or
    - `GCP_SA_JSON` — the full service-account JSON
    - `FIRMS_MAP_KEY` — NASA FIRMS MAP key (hotspots)
 4. If the linked dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET` (or GitHub variable) to the real id.
-5. Re-run **Cloudflare Prod**. The workflow uploads `GCP_SA_JSON` and `FIRMS_MAP_KEY` as Wrangler secrets on Worker `aegisflow`:
+5. **Cloudflare KV** (one-time if the prod workflow cannot create it): the Cloudflare Prod job runs `scripts/ensure-wind-cache-kv.mjs`, which creates or reuses namespace `aegisflow-WIND_CACHE` and binds it as `WIND_CACHE`. The API token needs Workers KV edit. If that step fails:
+
+```bash
+npx wrangler kv namespace create WIND_CACHE
+# paste the printed id into wrangler.jsonc kv_namespaces[0].id
+```
+
+6. Re-run **Cloudflare Prod**. The workflow uploads `GCP_SA_JSON` and `FIRMS_MAP_KEY` as Wrangler secrets on Worker `aegisflow`, binds KV, and deploys the cron:
 
 ```bash
 npx wrangler secret put FIRMS_MAP_KEY
 npx wrangler secret put GCP_SA_JSON
 ```
 
-Until those secrets exist, Ops keeps serving the remapped AegisFire-01 fixture in the selected bbox and does not blank the page.
+Until secrets + KV exist, Ops keeps serving the remapped AegisFire-01 fixture in the selected bbox and does not blank the page. After the first successful cron (~8 minutes, or Cloudflare Dashboard → Worker `aegisflow` → Triggers → Cron → Send now), El Salvador and Cascade serve cyan **WIND LIVE** from cache.
+
+Local: `next dev` skips KV. `wrangler dev --test-scheduled` then `curl "http://localhost:8787/__scheduled?cron=*/8+*+*+*+*"` exercises the refresh handler against simulated KV.

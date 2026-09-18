@@ -42,7 +42,11 @@ export async function loadOpsIncident(
   const region = resolveOpsRegion(regionId);
   const base = cloneFixtureIncident();
   const crowd = scrubPii(SAMPLE_CROWD_REPORT);
-  const ingestRegion = { bbox: region.bbox, center: region.center };
+  const ingestRegion = {
+    id: region.id,
+    bbox: region.bbox,
+    center: region.center,
+  };
 
   const [firms, wind] = await Promise.all([
     fetchFirmsHotspots(region.bbox, deps.firms),

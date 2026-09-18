@@ -46,6 +46,9 @@ assert.match(wrangler, /"NEXTJS_ENV": "production"/);
 assert.match(wrangler, /"GCP_PROJECT_ID": "aegisflow-ieee-quest"/);
 assert.match(wrangler, /"WEATHERNEXT_BQ_DATASET": "weathernext"/);
 assert.match(wrangler, /"WEATHERNEXT_BQ_TABLE": "weathernext_3_0_0_0p1deg"/);
+assert.match(wrangler, /"main": "cloudflare-worker\.ts"/);
+assert.match(wrangler, /"binding": "WIND_CACHE"/);
+assert.match(wrangler, /\*\/8 \* \* \* \*/);
 
 const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
 assert.match(workflow, /command: deploy/);
@@ -56,6 +59,7 @@ assert.match(
 );
 assert.match(workflow, /FIRMS_MAP_KEY/);
 assert.match(workflow, /GCP_SA_JSON/);
+assert.match(workflow, /ensure-wind-cache-kv\.mjs/);
 
 const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
 assert.match(pathWorker, /publicResponseHeaders/);

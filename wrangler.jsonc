@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "aegisflow",
-  "main": ".open-next/worker.js",
+  "main": "cloudflare-worker.ts",
   "compatibility_date": "2026-09-11",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "account_id": "8a8c9483df8e8a2a9adec437a0994fe4",
@@ -10,6 +10,25 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  // Custom worker imports `@/lib/...` from src (OpenNext fetch is pre-bundled).
+  "alias": {
+    "@": "./src"
+  },
+  "tsconfig": "./tsconfig.json",
+  // Picker-region WeatherNext cache. Cron ~8 min × 2 bboxes ≈ 12–16 queries/hour.
+  "triggers": {
+    "crons": ["*/8 * * * *"]
+  },
+  // Binding only — Cloudflare Prod runs scripts/ensure-wind-cache-kv.mjs to
+  // create/look up namespace `aegisflow-WIND_CACHE` and write `id` before deploy.
+  // Local `wrangler dev` simulates KV without a remote id.
+  // Jaime one-time if the API token cannot create KV:
+  //   npx wrangler kv namespace create WIND_CACHE
+  "kv_namespaces": [
+    {
+      "binding": "WIND_CACHE"
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
