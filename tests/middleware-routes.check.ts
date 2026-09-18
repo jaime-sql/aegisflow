@@ -11,6 +11,8 @@ assert.equal(isClerkPublicPath("/ops"), false);
 assert.equal(isClerkPublicPath("/aegisflow/ops"), false);
 assert.equal(isClerkPublicPath("/api/ops/wind-cache-refresh"), false);
 assert.equal(isClerkPublicPath("/aegisflow/api/ops/wind-cache-refresh"), false);
+assert.equal(isClerkPublicPath("/api/ops/brief-aloud"), false);
+assert.equal(isClerkPublicPath("/aegisflow/api/ops/brief-aloud"), false);
 assert.equal(isClerkPublicPath("/"), false);
 assert.equal(isClerkPublicPath("/aegisflow"), false);
 

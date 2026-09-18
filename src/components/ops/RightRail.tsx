@@ -15,12 +15,14 @@ export function RightRail({
   selectedAgentId,
   onSelectAgent,
   onViewLineage,
+  ttsConfigured,
 }: {
   incident: IncidentEvent;
   role: OpsRole;
   selectedAgentId: string | null;
   onSelectAgent: (agent: AgentOutput) => void;
   onViewLineage: () => void;
+  ttsConfigured: boolean;
 }) {
   const actions = useMemo(() => {
     const rows: DispatchAction[] = [];
@@ -32,7 +34,12 @@ export function RightRail({
 
   return (
     <aside className="ops-scroll h-full overflow-y-auto border-l border-[#1E2A40] bg-[#121A2B]">
-      <ExecSummaryCard incident={incident} onViewLineage={onViewLineage} />
+      <ExecSummaryCard
+        incident={incident}
+        onViewLineage={onViewLineage}
+        role={role}
+        ttsConfigured={ttsConfigured}
+      />
 
       <section className="border-b border-[#1E2A40] px-4 py-3">
         <h2 className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#8B9BB8]">

@@ -7,3 +7,8 @@ export function parseOpsRole(value: unknown): OpsRole {
 export function canDispatch(role: OpsRole): boolean {
   return role === "manager";
 }
+
+/** Manager-only ElevenLabs Brief aloud. Viewer never sees or triggers TTS. */
+export function canSpeakBrief(role: OpsRole): boolean {
+  return role === "manager";
+}
