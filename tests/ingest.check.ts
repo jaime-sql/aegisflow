@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 import { fetchFirmsHotspots } from "../src/lib/ingest/firms";
 import { fetchWindTicks, queryLiveWindTicks } from "../src/lib/ingest/wind";
 import {
+  BQ_CRON_BUDGET_MS,
+  BQ_CRON_JOB_WAIT_MS,
+  BQ_CRON_MAX_POLLS,
   BQ_JOB_TIMEOUT_CODE,
+  BQ_JOB_WAIT_MS,
   BQ_MAX_BYTES_BILLED,
+  BQ_MAX_POLLS,
+  BQ_WORKER_BUDGET_MS,
   runBigQuerySql,
 } from "../src/lib/ingest/bigquery";
 import { resetGcpTokenCache, signServiceAccountJwt } from "../src/lib/ingest/gcp-auth";
@@ -417,7 +423,8 @@ async function bigQueryIncompleteThenPollSucceeds() {
       };
       assert.match(body.query ?? "", /INTERVAL 12 HOUR/);
       assert.match(body.query ?? "", /ST_INTERSECTS\(t\.geography/);
-      assert.equal(body.timeoutMs, 12_000);
+      assert.equal(body.timeoutMs, BQ_JOB_WAIT_MS);
+      assert.equal(body.timeoutMs, 12_000, "click/default queryLiveWindTicks keeps the short budget");
       assert.equal(body.maximumBytesBilled, BQ_MAX_BYTES_BILLED);
       return jsonResponse({ ...liveBqPayload(false), rows: undefined, schema: undefined });
     }
@@ -574,6 +581,16 @@ async function loadIncidentDegradedStaysUp() {
   }
 }
 
+function cronBudgetIsLongerThanRequestBudget() {
+  assert.equal(BQ_WORKER_BUDGET_MS, 22_000);
+  assert.equal(BQ_JOB_WAIT_MS, 12_000);
+  assert.equal(BQ_MAX_POLLS, 1);
+  assert.equal(BQ_CRON_BUDGET_MS, 90_000);
+  assert.equal(BQ_CRON_JOB_WAIT_MS, 20_000);
+  assert.equal(BQ_CRON_MAX_POLLS, 5);
+  assert.ok(BQ_CRON_BUDGET_MS >= 60_000 && BQ_CRON_BUDGET_MS <= 90_000);
+}
+
 function uiWiring() {
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /MapLegendStack/);
@@ -633,6 +650,7 @@ async function main() {
   await bigQueryIncompleteThenPollSucceeds();
   await bigQueryTimeoutFailsFastToFixture();
   await runBigQuerySqlTimeoutThrowsCode();
+  cronBudgetIsLongerThanRequestBudget();
   windBannerCopyNeverLeaksTimeout();
   await loadIncidentFixtureFallback();
   await loadIncidentDegradedStaysUp();

@@ -6,7 +6,11 @@ import {
   WIND_OFFLINE_DETAIL,
   isLiveWeatherNextWind,
 } from "@/lib/ui/wind-feed";
-import { runBigQuerySql } from "./bigquery";
+import {
+  BQ_CRON_SQL_DEPS,
+  runBigQuerySql,
+  type RunBigQuerySqlDeps,
+} from "./bigquery";
 import { fetchGcpAccessToken, loadServiceAccountFromEnv } from "./gcp-auth";
 import type { IngestFetch, IngestEnv, IngestRegion } from "./types";
 import {
@@ -24,7 +28,7 @@ import {
   regionIdFromIngest,
   writeWindCache,
   type WindKv,
-  } from "./wind-cache";
+} from "./wind-cache";
 
 export type WindResult = {
   wind: WindTick[];
@@ -32,6 +36,11 @@ export type WindResult = {
   usedFixture: boolean;
   fromCache?: boolean;
 };
+
+export type WindBqDeps = Pick<
+  RunBigQuerySqlDeps,
+  "budgetMs" | "jobWaitMs" | "maxPolls"
+>;
 
 export type WindFetchDeps = {
   fetch?: IngestFetch;
@@ -44,6 +53,11 @@ export type WindFetchDeps = {
    */
   kv?: WindKv | null;
   nowMs?: number;
+  /**
+   * BigQuery jobs.query budget. Refresh defaults to `BQ_CRON_SQL_DEPS`.
+   * Ops/judge `fetchWindTicks` never calls BigQuery when KV is bound.
+   */
+  bigQuery?: WindBqDeps;
 };
 
 export type WindRefreshResult = {
@@ -52,7 +66,10 @@ export type WindRefreshResult = {
   cells: number;
   skipped?: boolean;
   error?: string;
+  elapsedMs?: number;
 };
+
+export type WindCacheRefreshTrigger = "cron" | "admin";
 
 function fixtureWind(region: IngestRegion): WindTick[] {
   return remapLatLonToBbox(loadFixtureIncident().wind, region.bbox);
@@ -86,6 +103,7 @@ async function queryViaBigQuery(
   region: IngestRegion,
   env: IngestEnv,
   doFetch: IngestFetch,
+  bq?: WindBqDeps,
 ): Promise<WindTick[]> {
   const sa = loadServiceAccountFromEnv(env);
   if (!sa) {
@@ -98,14 +116,15 @@ async function queryViaBigQuery(
     sql,
     { projectId: table.projectId, location: table.location },
     token,
-    { fetch: doFetch },
+    { fetch: doFetch, ...bq },
   );
   return mapWeatherNextRowsToWindTicks(parseWeatherNextQueryRows(fields, rows));
 }
 
 /**
  * BigQuery WeatherNext 10 m wind. **Cron / refresh only** — keep the #14
- * SQL budget (12h init_time, bbox, hours 1–6, LIMIT 24, fail-fast).
+ * SQL budget (12h init_time, bbox, hours 1–6, LIMIT 24). Callers that wait
+ * (cron/admin) pass `BQ_CRON_SQL_DEPS`; default is the short request budget.
  */
 export async function queryLiveWindTicks(
   region: IngestRegion,
@@ -125,10 +144,10 @@ export async function queryLiveWindTicks(
       ),
     );
   }
-  return queryViaBigQuery(region, env, deps.fetch ?? fetch);
+  return queryViaBigQuery(region, env, deps.fetch ?? fetch, deps.bigQuery);
 }
 
-async function resolveWindKv(
+export async function resolveWindKv(
   deps: WindFetchDeps,
   env: IngestEnv,
 ): Promise<WindKv | null> {
@@ -247,26 +266,90 @@ export async function fetchWindTicks(
   }
 }
 
+export type WindCacheRefreshLog = {
+  msg: "weathernext_cache_refresh";
+  trigger: WindCacheRefreshTrigger;
+  cron?: string;
+  scheduledTime?: number;
+  ok: boolean;
+  results: Array<{
+    regionId: WindRefreshResult["regionId"];
+    ok: boolean;
+    cells: number;
+    error: string | null;
+    skipped: boolean;
+    elapsedMs?: number;
+  }>;
+};
+
+/** Structured cron/admin log: `weathernext_cache_refresh` with ok/error per region. */
+export function windCacheRefreshLogPayload(
+  results: WindRefreshResult[],
+  extra: {
+    trigger: WindCacheRefreshTrigger;
+    cron?: string;
+    scheduledTime?: number;
+  },
+): WindCacheRefreshLog {
+  return {
+    msg: "weathernext_cache_refresh",
+    trigger: extra.trigger,
+    cron: extra.cron,
+    scheduledTime: extra.scheduledTime,
+    ok: results.length > 0 && results.every((r) => r.ok),
+    results: results.map((r) => ({
+      regionId: r.regionId,
+      ok: r.ok,
+      cells: r.cells,
+      error: r.error ?? null,
+      skipped: Boolean(r.skipped),
+      elapsedMs: r.elapsedMs,
+    })),
+  };
+}
+
+export function logWindCacheRefresh(
+  results: WindRefreshResult[],
+  extra: {
+    trigger: WindCacheRefreshTrigger;
+    cron?: string;
+    scheduledTime?: number;
+  },
+): WindCacheRefreshLog {
+  const payload = windCacheRefreshLogPayload(results, extra);
+  console.log(JSON.stringify(payload));
+  return payload;
+}
+
 /**
  * Cron / scheduled refresh: query both picker regions and write KV.
- * Failures leave the previous key in place (no empty overwrite).
+ * Uses the long BigQuery budget (`BQ_CRON_SQL_DEPS`). Failures leave the
+ * previous key in place (no empty overwrite).
  */
 export async function refreshPickerRegionWindCache(
   deps: WindFetchDeps & { kv: WindKv },
 ): Promise<WindRefreshResult[]> {
   const env = deps.env ?? process.env;
   const results: WindRefreshResult[] = [];
+  const bigQuery = deps.bigQuery ?? BQ_CRON_SQL_DEPS;
 
   for (const regionId of WIND_CACHE_REGION_IDS) {
     const region = OPS_REGIONS[regionId];
+    const started = Date.now();
     try {
       if (env.AEGISFLOW_USE_WEATHERNEXT_FIXTURE === "true") {
-        results.push({ regionId, ok: false, cells: 0, skipped: true });
+        results.push({
+          regionId,
+          ok: false,
+          cells: 0,
+          skipped: true,
+          elapsedMs: Date.now() - started,
+        });
         continue;
       }
       const ticks = await queryLiveWindTicks(
         { id: regionId, bbox: region.bbox, center: region.center },
-        deps,
+        { ...deps, bigQuery },
       );
       if (ticks.length === 0 || !ticks.every((t) => isLiveWeatherNextWind(t))) {
         results.push({
@@ -274,21 +357,33 @@ export async function refreshPickerRegionWindCache(
           ok: false,
           cells: 0,
           error: "empty_or_not_live",
+          elapsedMs: Date.now() - started,
         });
         continue;
       }
       const table = resolveWeatherNextTable(env);
       await writeWindCache(deps.kv, regionId, ticks, { tableId: table.tableId });
-      results.push({ regionId, ok: true, cells: ticks.length });
+      results.push({
+        regionId,
+        ok: true,
+        cells: ticks.length,
+        elapsedMs: Date.now() - started,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "unknown wind error";
       console.warn("[weathernext] refresh", regionId, message);
-      results.push({ regionId, ok: false, cells: 0, error: message });
+      results.push({
+        regionId,
+        ok: false,
+        cells: 0,
+        error: message,
+        elapsedMs: Date.now() - started,
+      });
     }
   }
 
   return results;
 }
 
-export { ingestEnvFromWorker };
+export { ingestEnvFromWorker, BQ_CRON_SQL_DEPS };
 export type { WindKv };

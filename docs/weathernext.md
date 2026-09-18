@@ -59,7 +59,7 @@ fetchWindTicks(region: { id?: string; bbox: BBox; center: GeoPoint }, deps?: {
   env?: IngestEnv;
 }): Promise<WindResult>
 
-// Cron / refresh path — #14 SQL into KV
+// Cron / refresh path — #14 SQL into KV (90s BigQuery budget, not the click fail-fast)
 refreshPickerRegionWindCache(deps: {
   kv: WindKv;
   client?: WeatherNextQueryClient; // tests
@@ -76,9 +76,13 @@ refreshPickerRegionWindCache(deps: {
 - clustered `geography` intersected with the **active region bbox**
 - lead hours `BETWEEN 1 AND 6` (nearest hour in that window)
 - `LIMIT 24` cells (map samples 16)
-- `jobs.query` waits ~12s, then **one** `getQueryResults` poll; incomplete jobs fail that region without hanging cron
+- **Cron/admin only:** `jobs.query` waits ~20s, then up to **five** `getQueryResults` polls, **90s wall** per region (Cloudflare scheduled duration limit is 15 min). The judge-click fail-fast (~12s + 1 poll, 22s wall) is unused on this path.
 
 Cost: 2 regions × ~7.5 refreshes/hour ≈ **12–16 small queries/hour**, not one query per Ops load. Failed refreshes leave the previous KV value in place (no empty overwrite). World-wide regions are out of scope.
+
+Each refresh logs a single JSON line `weathernext_cache_refresh` with `ok` plus per-region `{ regionId, ok, cells, error }`.
+
+**One-shot fill (optional):** signed-in `GET`/`POST` `/aegisflow/api/ops/wind-cache-refresh` (Clerk-protected, same as Ops). Uses the cron BigQuery budget so Jaime can seed KV without waiting for the next `*/8` tick.
 
 Local / CI / KV unbound: skip gracefully to the AegisFire-01 fixture (`ok`, live skipped). `AEGISFLOW_FAIL_WIND=true` → empty vectors + `down`. Force skip even with creds: `AEGISFLOW_USE_WEATHERNEXT_FIXTURE=true`.
 
@@ -104,6 +108,6 @@ npx wrangler secret put FIRMS_MAP_KEY
 npx wrangler secret put GCP_SA_JSON
 ```
 
-Until secrets + KV exist, Ops keeps serving the remapped AegisFire-01 fixture in the selected bbox and does not blank the page. After the first successful cron (~8 minutes, or Cloudflare Dashboard → Worker `aegisflow` → Triggers → Cron → Send now), El Salvador and Cascade serve cyan **WIND LIVE** from cache.
+Until secrets + KV exist, Ops keeps serving the remapped AegisFire-01 fixture in the selected bbox and does not blank the page. After the first successful cron (~8 minutes, or Cloudflare Dashboard → Worker `aegisflow` → Triggers → Cron → Send now), El Salvador and Cascade serve cyan **WIND LIVE** from cache. Signed-in one-shot: `GET https://cortexmatter.com/aegisflow/api/ops/wind-cache-refresh` (waits on BigQuery, then writes KV).
 
 Local: `next dev` skips KV. `wrangler dev --test-scheduled` then `curl "http://localhost:8787/__scheduled?cron=*/8+*+*+*+*"` exercises the refresh handler against simulated KV.

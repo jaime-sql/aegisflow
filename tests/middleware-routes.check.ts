@@ -9,6 +9,8 @@ assert.equal(isClerkPublicPath("/aegisflow/sign-in/"), true);
 assert.equal(isClerkPublicPath("/aegisflow/sign-up/continue"), true);
 assert.equal(isClerkPublicPath("/ops"), false);
 assert.equal(isClerkPublicPath("/aegisflow/ops"), false);
+assert.equal(isClerkPublicPath("/api/ops/wind-cache-refresh"), false);
+assert.equal(isClerkPublicPath("/aegisflow/api/ops/wind-cache-refresh"), false);
 assert.equal(isClerkPublicPath("/"), false);
 assert.equal(isClerkPublicPath("/aegisflow"), false);
 
