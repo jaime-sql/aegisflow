@@ -30,10 +30,19 @@ export const OPTIONAL_WORKER_SECRETS = [
   "ELEVENLABS_VOICE_ID",
 ];
 
+/** @param {unknown} value */
 export function presentValue(value) {
   return Boolean(String(value ?? "").trim());
 }
 
+/**
+ * Env-like map for Worker secret selection. Intentionally not ProcessEnv:
+ * tests pass partial objects without NODE_ENV, and Next.js makes NODE_ENV
+ * required on ProcessEnv so `next build` would reject those fixtures.
+ *
+ * @param {NodeJS.Dict<string>} [env]
+ * @returns {{ missingRequired: string[], present: string[], skipped: string[] }}
+ */
 export function selectWorkerSecrets(env = process.env) {
   const missingRequired = REQUIRED_WORKER_SECRETS.filter((name) => !presentValue(env[name]));
   const present = [];
@@ -48,6 +57,10 @@ export function selectWorkerSecrets(env = process.env) {
   return { missingRequired, present, skipped };
 }
 
+/**
+ * @param {string[]} names
+ * @param {string} [delimiter]
+ */
 export function githubOutputList(names, delimiter = "AEGISFLOW_WORKER_SECRETS") {
   return `list<<${delimiter}\n${names.join("\n")}\n${delimiter}\n`;
 }
