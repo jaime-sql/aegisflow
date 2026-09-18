@@ -310,11 +310,10 @@ function uiWiring() {
 
   const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
   assert.match(workflow, /ELEVENLABS_API_KEY/);
-  assert.match(
-    workflow,
-    /secrets: \|[\s\S]*ELEVENLABS_API_KEY[\s\S]*ELEVENLABS_VOICE_ID/,
-  );
-  assert.match(
+  assert.match(workflow, /ELEVENLABS_VOICE_ID/);
+  assert.match(workflow, /scripts\/select-worker-secrets\.mjs/);
+  assert.match(workflow, /steps\.worker_secrets\.outputs\.list/);
+  assert.doesNotMatch(
     workflow,
     /secrets\.ELEVENLABS_VOICE_ID \|\| '21m00Tcm4TlvDq8ikWAM'/,
   );
@@ -329,6 +328,7 @@ function uiWiring() {
 
   const docs = readFileSync("docs/brief-aloud.md", "utf8");
   assert.match(docs, /21m00Tcm4TlvDq8ikWAM/);
+  assert.match(docs, /optional for Prod/i);
   assert.match(docs, /Manager only/);
   assert.match(docs, /tts:<eventId>/);
   assert.match(docs, /Acceptance \(Design \+ QA\)/);

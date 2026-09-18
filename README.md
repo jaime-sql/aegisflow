@@ -112,10 +112,10 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
 | `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions with a 90s BigQuery budget. Ops reads cache only. Signed-in `GET /aegisflow/api/ops/wind-cache-refresh` is a one-shot fill. |
-| `OPENAI_API_KEY` / `DEEPSEEK_*` | LLM router. Empty → fixture agents (CI). Live: OpenAI primary, DeepSeek backup. See [`docs/agents.md`](docs/agents.md). |
-| `MODAL_ENDPOINT` / `MODAL_TOKEN_*` | Preferred agent host. Empty → local LLM or fixture. Proxy-auth headers sent when tokens are set. |
-| `ELEVENLABS_API_KEY` | Manager **Brief aloud** (exec summary TTS). Worker secret (Cloudflare Prod uploads the Actions secret). Empty → muted **SIM**. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
-| `ELEVENLABS_VOICE_ID` | Optional Worker secret. Default premade Rachel `21m00Tcm4TlvDq8ikWAM` (Jaime did not pick a voice). Override via Actions secret / Wrangler / `.env.local`. |
+| `OPENAI_API_KEY` / `DEEPSEEK_*` | LLM router. **Optional for Cloudflare Prod** — empty/missing GitHub secrets are skipped (wrangler-action fails if they are listed empty). Empty → fixture agents (**SIM**). Live: OpenAI primary, DeepSeek backup. See [`docs/agents.md`](docs/agents.md). |
+| `MODAL_ENDPOINT` / `MODAL_TOKEN_*` | Preferred agent host. **Optional for Prod** (same skip-if-empty rule). Empty → local LLM or fixture. Proxy-auth headers sent when tokens are set. |
+| `ELEVENLABS_API_KEY` | Manager **Brief aloud** (exec summary TTS). **Optional for Prod.** When the Actions secret is set, Cloudflare Prod uploads it as a Worker secret; when empty, it is skipped and Brief aloud shows muted **SIM**. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
+| `ELEVENLABS_VOICE_ID` | Optional Worker secret (skip-if-empty). Default premade Rachel `21m00Tcm4TlvDq8ikWAM` comes from `wrangler.jsonc` when the secret is unset (Jaime did not pick a voice). Override via Actions secret / Wrangler / `.env.local`. |
 | `AEGISFLOW_LIVE_LLM` | Set `false` to force fixture even if keys exist. |
 
 ## Repo layout
@@ -138,6 +138,7 @@ docs/agents.md
 docs/brief-aloud.md
 cloudflare-worker.ts     OpenNext fetch + WeatherNext KV cron
 scripts/ensure-wind-cache-kv.mjs
+scripts/select-worker-secrets.mjs  skip empty optional Prod secrets (OpenAI/ElevenLabs/…)
 workers/modal_stub.py    local printer + `modal deploy` HTTP worker
 workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
 .github/workflows/cloudflare-prod.yml
@@ -164,16 +165,16 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - Optional live ingest (otherwise Ops uses the AegisFire-01 fixture and FeedBanner stays quiet):
      - `FIRMS_MAP_KEY` — NASA FIRMS MAP key. Also uploaded as Wrangler secret `FIRMS_MAP_KEY` on Worker `aegisflow`.
      - `GCP_SA_JSON` — service-account JSON for GCP project `aegisflow-ieee-quest` (BigQuery Job User + Data Viewer on the WeatherNext Analytics Hub dataset). Wrangler secret `GCP_SA_JSON`.
-   - Optional live agents (otherwise AgentChip shows **SIM** like RF/Edge; Ops stays up). See [`docs/agents.md`](docs/agents.md):
-     - `OPENAI_API_KEY` — primary LLM. Wrangler secret.
-     - `DEEPSEEK_API_KEY` — cheaper backup LLM. Wrangler secret.
-     - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var.
-     - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal proxy token. Wrangler secrets.
-   - Optional **Brief aloud** (Manager exec-summary TTS; empty → muted SIM). See [`docs/brief-aloud.md`](docs/brief-aloud.md):
-     - `ELEVENLABS_API_KEY` — Worker secret (Cloudflare Prod uploads the Actions secret). Expire-first credits; last clip cached per `eventId` in `WIND_CACHE` (`tts:` keys).
-     - `ELEVENLABS_VOICE_ID` — optional Worker secret. Default Rachel `21m00Tcm4TlvDq8ikWAM` if unset.
+   - Optional live agents (otherwise AgentChip shows **SIM** like RF/Edge; Ops stays up). **Not required to deploy.** Empty GitHub secrets are omitted from wrangler-action `secrets:` so Prod does not fail. See [`docs/agents.md`](docs/agents.md):
+     - `OPENAI_API_KEY` — primary LLM. Wrangler secret when set; skip when empty.
+     - `DEEPSEEK_API_KEY` — cheaper backup LLM. Wrangler secret when set; skip when empty.
+     - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var when set.
+     - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal proxy token. Wrangler secrets when set.
+   - Optional **Brief aloud** (Manager exec-summary TTS; empty → muted SIM). **Not required to deploy.** When `ELEVENLABS_API_KEY` is set, Cloudflare Prod uploads it; when empty, Brief aloud stays SIM. See [`docs/brief-aloud.md`](docs/brief-aloud.md):
+     - `ELEVENLABS_API_KEY` — Worker secret when set. Expire-first credits; last clip cached per `eventId` in `WIND_CACHE` (`tts:` keys).
+     - `ELEVENLABS_VOICE_ID` — optional Worker secret when set. Default Rachel `21m00Tcm4TlvDq8ikWAM` from `wrangler.jsonc` if unset.
    - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
-4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys, ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON`, agent secrets `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_*`, and ElevenLabs `ELEVENLABS_API_KEY` / optional `ELEVENLABS_VOICE_ID` as Worker secrets; path, WeatherNext dataset, `DEEPSEEK_BASE_URL`, ElevenLabs model, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), then **uploads only non-empty Worker secrets** (`scripts/select-worker-secrets.mjs` — Clerk is required; `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_*` / `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` are skipped when empty so wrangler-action does not fail) and deploys Worker `aegisflow`. Path, WeatherNext dataset, `DEEPSEEK_BASE_URL`, ElevenLabs model/voice default, and cron `*/8 * * * *` come from `wrangler.jsonc`. Then it deploys `workers/aegisflow-path`. **OpenAI is not required to deploy.**
    - If the KV step fails, the API token needs Workers KV edit, or Jaime runs `npx wrangler kv namespace create WIND_CACHE` once and pastes the id into `wrangler.jsonc`. See [`docs/weathernext.md`](docs/weathernext.md).
 5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
@@ -241,4 +242,4 @@ AegisFlow is an original IEEE Response Quest submission (#5395). Sample FIRMS, w
 
 ## Secrets
 
-Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, ElevenLabs, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_TOKEN_SECRET` / `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` belong.
+Do not commit Clerk, FIRMS, GCP service-account JSON, OpenAI, DeepSeek, Modal, ElevenLabs, or Cloudflare API tokens. `.env.local` and `.dev.vars` stay on the machine. GitHub Actions secrets are the only place `CLOUDFLARE_API_TOKEN` / `CLERK_SECRET_KEY` / `FIRMS_MAP_KEY` / `GCP_SA_JSON` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MODAL_TOKEN_SECRET` / `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` belong. Agent + ElevenLabs keys are **optional for Prod**; empty values are not uploaded.
