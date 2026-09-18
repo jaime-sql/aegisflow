@@ -4,6 +4,7 @@ import {
   absoluteAppUrl,
   clerkPublicUrls,
   inferBasePathFromPathname,
+  opsBriefAloudUrl,
   opsIncidentUrl,
   opsRegionHref,
   resolveBasePath,
@@ -76,6 +77,15 @@ assert.equal(
   "https://cortexmatter.com/aegisflow/api/ops/incident?region=cascade",
 );
 assert.doesNotMatch(opsIncidentUrl("cascade", workerOps), /^https?:\/\/[^/]+\/api\//);
+
+assert.equal(
+  opsBriefAloudUrl("evt_svwui_incident", "el-salvador", workerOps),
+  "https://aegisflow.jaime-8a8.workers.dev/aegisflow/api/ops/brief-aloud?eventId=evt_svwui_incident&region=el-salvador",
+);
+assert.equal(
+  opsBriefAloudUrl("evt_aegisfire01_incident", "cascade", "http://localhost:3000/ops"),
+  "http://localhost:3000/api/ops/brief-aloud?eventId=evt_aegisfire01_incident&region=cascade",
+);
 
 assert.equal(opsRegionHref("cascade", workerOps), "/aegisflow/ops?region=cascade");
 assert.equal(

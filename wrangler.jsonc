@@ -22,6 +22,7 @@
   // Binding only — Cloudflare Prod runs scripts/ensure-wind-cache-kv.mjs to
   // create/look up namespace `aegisflow-WIND_CACHE` and write `id` before deploy.
   // Local `wrangler dev` simulates KV without a remote id.
+  // Keys: wind:<region> (WeatherNext) and tts:<eventId> (Brief aloud cache).
   // Jaime one-time if the API token cannot create KV:
   //   npx wrangler kv namespace create WIND_CACHE
   "kv_namespaces": [
@@ -41,9 +42,9 @@
   ],
   // Non-secret runtime env. OpenNext middleware / RSC read process.env here;
   // next.config.ts inlines the same values at build. Clerk keys, ingest
-  // secrets (FIRMS_MAP_KEY, GCP_SA_JSON), and agent secrets (OPENAI_API_KEY,
-  // DEEPSEEK_API_KEY, MODAL_*) are Worker secrets — see cloudflare-prod.yml —
-  // not vars.
+  // secrets (FIRMS_MAP_KEY, GCP_SA_JSON), agent secrets (OPENAI_API_KEY,
+  // DEEPSEEK_API_KEY, MODAL_*), and ELEVENLABS_API_KEY are Worker secrets —
+  // see cloudflare-prod.yml — not vars. ELEVENLABS_VOICE_ID is a var.
   "vars": {
     "NEXTJS_ENV": "production",
     "CLOUDFLARE_PROD": "true",
@@ -60,6 +61,8 @@
     "WEATHERNEXT_BQ_DATASET": "weathernext",
     "WEATHERNEXT_BQ_TABLE": "weathernext_3_0_0_0p1deg",
     "WEATHERNEXT_BQ_LOCATION": "US",
-    "DEEPSEEK_BASE_URL": "https://api.deepseek.com"
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    "ELEVENLABS_VOICE_ID": "21m00Tcm4TlvDq8ikWAM",
+    "ELEVENLABS_MODEL_ID": "eleven_flash_v2_5"
   }
 }

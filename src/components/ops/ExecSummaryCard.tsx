@@ -1,11 +1,17 @@
 import type { IncidentEvent } from "@/lib/schema";
+import { canSpeakBrief, type OpsRole } from "@/lib/auth/roles";
+import { BriefAloudButton } from "./BriefAloudButton";
 
 export function ExecSummaryCard({
   incident,
   onViewLineage,
+  role,
+  ttsConfigured,
 }: {
   incident: IncidentEvent;
   onViewLineage: () => void;
+  role: OpsRole;
+  ttsConfigured: boolean;
 }) {
   const sources = ["FIRMS", "WeatherNext", "RAG"];
   return (
@@ -26,6 +32,13 @@ export function ExecSummaryCard({
             {s}
           </span>
         ))}
+        {canSpeakBrief(role) ? (
+          <BriefAloudButton
+            eventId={incident.eventId}
+            regionId={incident.region.id}
+            configured={ttsConfigured}
+          />
+        ) : null}
         <button
           type="button"
           onClick={onViewLineage}

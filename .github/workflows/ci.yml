@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-fund --no-audit
-      # Adapters must fixture-fallback. Do not provide live FIRMS / GCP / LLM / Modal keys in CI.
+      # Adapters must fixture-fallback. Do not provide live FIRMS / GCP / LLM / Modal / ElevenLabs keys in CI.
       - run: npm test
         env:
           FIRMS_MAP_KEY: ""
@@ -31,3 +31,4 @@ jobs:
           MODAL_TOKEN_ID: ""
           MODAL_TOKEN_SECRET: ""
           AEGISFLOW_LIVE_LLM: "false"
+          ELEVENLABS_API_KEY: ""

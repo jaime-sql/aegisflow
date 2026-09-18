@@ -96,6 +96,18 @@ export function opsIncidentUrl(regionId: string, currentHref?: string): string {
   );
 }
 
+/** GET `/api/ops/brief-aloud` under the active basePath (Manager-only TTS). */
+export function opsBriefAloudUrl(
+  eventId: string,
+  regionId: string,
+  currentHref?: string,
+): string {
+  return absoluteAppUrl(
+    `/api/ops/brief-aloud?eventId=${encodeURIComponent(eventId)}&region=${encodeURIComponent(regionId)}`,
+    currentHref,
+  );
+}
+
 /**
  * Same-origin Ops URL with `?region=` (and other query params preserved).
  * Pathname is taken from the current page so we never navigate to `/ops`

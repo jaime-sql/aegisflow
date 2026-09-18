@@ -25,10 +25,12 @@ export function OpsShell({
   incident,
   session,
   regionPicker,
+  ttsConfigured,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
   regionPicker: ReactNode;
+  ttsConfigured: boolean;
 }) {
   const [lineageId, setLineageId] = useState<string | null>(null);
   const selected = useMemo(
@@ -63,6 +65,7 @@ export function OpsShell({
           onViewLineage={() =>
             setLineageId(incident.agents[0]?.eventId ?? null)
           }
+          ttsConfigured={ttsConfigured}
         />
         {selected && (
           <LineageDrawer

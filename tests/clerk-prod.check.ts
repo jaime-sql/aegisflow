@@ -60,6 +60,7 @@ assert.match(
 assert.match(workflow, /FIRMS_MAP_KEY/);
 assert.match(workflow, /GCP_SA_JSON/);
 assert.match(workflow, /ensure-wind-cache-kv\.mjs/);
+assert.match(workflow, /ELEVENLABS_API_KEY/);
 
 const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
 assert.match(pathWorker, /publicResponseHeaders/);

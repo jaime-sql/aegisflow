@@ -2,6 +2,7 @@ import { OpsShell } from "@/components/ops/OpsShell";
 import { RegionPicker } from "@/components/ops/RegionPicker";
 import { getOpsSession } from "@/lib/auth/session";
 import { loadOpsIncident } from "@/lib/incident/load";
+import { isElevenLabsConfigured } from "@/lib/tts/brief";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function OpsPage({
       incident={incident}
       session={session}
       regionPicker={<RegionPicker regionId={incident.region.id} />}
+      ttsConfigured={isElevenLabsConfigured()}
     />
   );
 }
