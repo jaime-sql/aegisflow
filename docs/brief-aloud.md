@@ -4,6 +4,22 @@ Manager-only **Brief aloud** on the Ops **exec summary**. Short radio-style clip
 
 WIND LIVE fill and deeper agent-key work stay parked.
 
+## Acceptance (Design + QA)
+
+Both bars are PR acceptance. Design wins on Viewer chrome: the control is **hidden**, not locked-grey.
+
+| Bar | Rule |
+| --- | --- |
+| Design | One primary control on **Exec Summary only**. Label **Brief aloud**. No agent-rec control in v1. |
+| Design | **Manager only.** Viewer never sees or can trigger it (hidden, not greyed half-working). |
+| Design | Fail → muted/**SIM** on the control. Ops map/rail never break. |
+| Design | Playing state: **Speaking…**. Click again to stop. |
+| QA | Manager Brief aloud plays a **short** clip without blanking Ops. |
+| QA | Viewer never sees the control. Stays out of the Viewer rail. |
+| QA | Same `eventId` replay hits cache (no second ElevenLabs burn). |
+| QA | Missing key / API fail → quiet SIM or muted control. No crash, no toast spam. |
+| QA | Control only on Exec Summary. Shows **Speaking…** while playing. |
+
 ## Product cut
 
 | Rule | Behavior |

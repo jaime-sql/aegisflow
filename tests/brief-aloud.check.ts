@@ -254,16 +254,18 @@ function uiWiring() {
   const execCard = readFileSync("src/components/ops/ExecSummaryCard.tsx", "utf8");
   assert.match(execCard, /canSpeakBrief\(role\)/);
   assert.match(execCard, /BriefAloudButton/);
+  assert.match(execCard, /: null\}/);
   assert.doesNotMatch(execCard, /agent rec|AgentChip/);
-  assert.doesNotMatch(execCard, /Ack locked|greyed/);
+  assert.doesNotMatch(execCard, /Ack locked|greyed|opacity-70/);
 
   const briefBtn = readFileSync("src/components/ops/BriefAloudButton.tsx", "utf8");
-  assert.match(briefBtn, /Speaking/);
+  assert.match(briefBtn, /Speaking…/);
   assert.match(briefBtn, /SimBadge/);
   assert.match(briefBtn, /opsBriefAloudUrl/);
   assert.match(briefBtn, /state === "sim"/);
   assert.match(briefBtn, /Stop brief/);
   assert.match(briefBtn, /"Brief aloud"/);
+  assert.doesNotMatch(briefBtn, /toast|window\.alert|alert\(/);
 
   const agentChip = readFileSync("src/components/ops/AgentChip.tsx", "utf8");
   assert.doesNotMatch(agentChip, /BriefAloudButton|Brief aloud/);
@@ -271,6 +273,24 @@ function uiWiring() {
   const rail = readFileSync("src/components/ops/RightRail.tsx", "utf8");
   assert.match(rail, /ttsConfigured/);
   assert.match(rail, /role=\{role\}/);
+  assert.match(rail, /ExecSummaryCard/);
+  assert.doesNotMatch(rail, /BriefAloudButton|Brief aloud/);
+
+  for (const path of [
+    "src/components/ops/DispatchList.tsx",
+    "src/components/ops/TopBar.tsx",
+    "src/components/ops/LineageDrawer.tsx",
+    "src/components/ops/OpsMap.tsx",
+    "src/components/ops/ResourceBars.tsx",
+    "src/components/ops/TimelineScrubber.tsx",
+  ]) {
+    const src = readFileSync(path, "utf8");
+    assert.doesNotMatch(
+      src,
+      /BriefAloudButton|Brief aloud/,
+      `${path} must stay out of Brief aloud (exec summary only; not Viewer rail)`,
+    );
+  }
 
   const opsPage = readFileSync("src/app/ops/page.tsx", "utf8");
   assert.match(opsPage, /isElevenLabsConfigured/);
@@ -305,6 +325,11 @@ function uiWiring() {
   assert.match(docs, /21m00Tcm4TlvDq8ikWAM/);
   assert.match(docs, /Manager only/);
   assert.match(docs, /tts:<eventId>/);
+  assert.match(docs, /Acceptance \(Design \+ QA\)/);
+  assert.match(docs, /Viewer never sees/);
+  assert.match(docs, /Speaking…/);
+  assert.match(docs, /no toast spam/);
+  assert.match(docs, /Same `eventId` replay hits cache/);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/brief-aloud\.check\.ts/);

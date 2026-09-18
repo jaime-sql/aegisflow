@@ -32,6 +32,7 @@ export function ExecSummaryCard({
             {s}
           </span>
         ))}
+        {/* Manager-only Brief aloud. Viewer: hidden, not locked-grey. */}
         {canSpeakBrief(role) ? (
           <BriefAloudButton
             eventId={incident.eventId}
