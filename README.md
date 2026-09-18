@@ -111,7 +111,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `GCP_SA_JSON` | GCP service-account JSON for project `aegisflow-ieee-quest`. Empty → fixture wind. Wrangler secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
-| `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions. Ops reads cache only. |
+| `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions with a 90s BigQuery budget. Ops reads cache only. Signed-in `GET /aegisflow/api/ops/wind-cache-refresh` is a one-shot fill. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
 | `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
 | `AEGISFLOW_LIVE_LLM` | Must be `true` before any live LLM path is used (still a stub in Stage 1). |
