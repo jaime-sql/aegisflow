@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fetchFirmsHotspots } from "../src/lib/ingest/firms";
-import { fetchWindTicks } from "../src/lib/ingest/wind";
+import { fetchWindTicks, queryLiveWindTicks } from "../src/lib/ingest/wind";
 import {
   BQ_JOB_TIMEOUT_CODE,
   BQ_MAX_BYTES_BILLED,
@@ -67,6 +67,7 @@ const ENV_KEYS = [
   "AEGISFLOW_USE_FIRMS_FIXTURE",
   "AEGISFLOW_USE_WEATHERNEXT_FIXTURE",
   "AEGISFLOW_LIVE_WEATHERNEXT",
+  "CLOUDFLARE_PROD",
 ] as const;
 
 function stashEnv(): Record<string, string | undefined> {
@@ -173,7 +174,7 @@ async function windFixture() {
 }
 
 async function windLiveClient() {
-  const result = await fetchWindTicks(REGION, {
+  const result = await queryLiveWindTicks(REGION, {
     env: clearLiveEnv(),
     client: {
       async queryWind(sql) {
@@ -198,23 +199,28 @@ async function windLiveClient() {
       },
     },
   });
-  assert.equal(result.usedFixture, false);
-  assert.equal(result.health.status, "ok");
-  assert.match(result.health.detail, /Experimental/);
-  assert.equal(result.wind.length, 1);
-  const tick = WindTickSchema.parse(result.wind[0]);
+  assert.equal(result.length, 1);
+  const tick = WindTickSchema.parse(result[0]);
   assert.equal(tick.source, "WEATHERNEXT");
   assert.match(tick.eventId, /^evt_aegisfire01_wn_/);
 }
 
 async function windQueryFail() {
+  await assert.rejects(
+    () =>
+      queryLiveWindTicks(REGION, {
+        env: { GCP_SA_JSON: "{}" },
+        client: {
+          async queryWind() {
+            throw new Error("BigQuery HTTP 403");
+          },
+        },
+      }),
+    /BigQuery HTTP 403/,
+  );
   const result = await fetchWindTicks(REGION, {
+    kv: null,
     env: { GCP_SA_JSON: "{}" },
-    client: {
-      async queryWind() {
-        throw new Error("BigQuery HTTP 403");
-      },
-    },
   });
   assert.equal(result.usedFixture, true);
   assert.equal(result.health.status, "degraded");
@@ -344,13 +350,12 @@ async function jwtAndBigQueryHttp() {
     throw new Error(`unexpected fetch ${url}`);
   };
 
-  const result = await fetchWindTicks(REGION, {
+  const ticks = await queryLiveWindTicks(REGION, {
     env: { GCP_SA_JSON: saJson },
     fetch: doFetch,
   });
-  assert.equal(result.usedFixture, false);
-  assert.equal(result.wind[0]?.source, "WEATHERNEXT");
-  WindTickSchema.parse(result.wind[0]);
+  assert.equal(ticks[0]?.source, "WEATHERNEXT");
+  WindTickSchema.parse(ticks[0]);
 }
 
 function liveBqPayload(jobComplete = true) {
@@ -416,16 +421,13 @@ async function bigQueryIncompleteThenPollSucceeds() {
     throw new Error(`unexpected fetch ${url}`);
   };
 
-  const result = await fetchWindTicks(REGION, {
+  const ticks = await queryLiveWindTicks(REGION, {
     env: { GCP_SA_JSON: JSON.stringify(sa) },
     fetch: doFetch,
   });
-  assert.equal(result.usedFixture, false);
-  assert.equal(result.health.status, "ok");
-  assert.match(result.health.detail, /Experimental/);
-  assert.equal(result.wind[0]?.source, "WEATHERNEXT");
-  assert.equal(isLiveWeatherNextWind(result.wind[0]!), true);
-  assert.equal(windOverlayColor(result.wind[0]!), WIND_LIVE_COLOR);
+  assert.equal(ticks[0]?.source, "WEATHERNEXT");
+  assert.equal(isLiveWeatherNextWind(ticks[0]!), true);
+  assert.equal(windOverlayColor(ticks[0]!), WIND_LIVE_COLOR);
   assert.ok(calls.some((c) => c.startsWith("GET ") && c.includes("/queries/job_wind_1")));
 }
 
@@ -451,12 +453,28 @@ async function bigQueryTimeoutFailsFastToFixture() {
     throw new Error(`unexpected fetch ${url} ${init?.method ?? ""}`);
   };
 
-  const result = await fetchWindTicks(REGION, {
+  const ticksPromise = queryLiveWindTicks(REGION, {
     env: { GCP_SA_JSON: JSON.stringify(sa) },
     fetch: doFetch,
   });
+  await assert.rejects(ticksPromise, (err: unknown) => {
+    assert.ok(err instanceof Error);
+    assert.equal(err.message, BQ_JOB_TIMEOUT_CODE);
+    return true;
+  });
   const elapsed = Date.now() - started;
   assert.ok(elapsed < 3_000, `timeout path hung the Worker (${elapsed}ms)`);
+
+  let bqHits = 0;
+  const result = await fetchWindTicks(REGION, {
+    kv: null,
+    env: { GCP_SA_JSON: JSON.stringify(sa) },
+    fetch: async (input) => {
+      bqHits += 1;
+      throw new Error(`Ops path hit BigQuery ${String(input)}`);
+    },
+  });
+  assert.equal(bqHits, 0, "judge click path must not run BigQuery");
   assert.equal(result.usedFixture, true);
   assert.equal(result.health.status, "degraded");
   assert.equal(result.health.detail, WIND_FALLBACK_DETAIL);
@@ -565,6 +583,7 @@ function uiWiring() {
   assert.doesNotMatch(banner, /f\.label\}: \{f\.detail\}/);
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /publicWindBannerDetail/);
+  assert.match(top, /windChipDisplay/);
   assert.match(top, /FirmsVerifyButton/);
   assert.doesNotMatch(top, /disabled=/);
   assert.doesNotMatch(top, /onRegionChange/);
@@ -593,6 +612,7 @@ function uiWiring() {
   const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
   assert.match(workflow, /npx wrangler secret put FIRMS_MAP_KEY/);
   assert.match(workflow, /npx wrangler secret put GCP_SA_JSON/);
+  assert.match(workflow, /ensure-wind-cache-kv/);
 }
 
 async function main() {

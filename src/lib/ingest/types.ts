@@ -5,6 +5,8 @@ export type GeoPoint = { lat: number; lon: number };
 export type IngestRegion = {
   bbox: BBox;
   center: GeoPoint;
+  /** Picker id (`el-salvador` | `cascade`). Used for wind KV keys. */
+  id?: string;
 };
 
 export type IngestFetch = (

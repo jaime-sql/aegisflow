@@ -111,6 +111,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `GCP_SA_JSON` | GCP service-account JSON for project `aegisflow-ieee-quest`. Empty → fixture wind. Wrangler secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |
+| `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions. Ops reads cache only. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | Reserved for Stage 2 live LLM. Stage 1 agents return fixtures. |
 | `MODAL_ENDPOINT` | Reserved. Empty → `runtime: "local"` on agent outputs. |
 | `AEGISFLOW_LIVE_LLM` | Must be `true` before any live LLM path is used (still a stub in Stage 1). |
@@ -122,7 +123,7 @@ src/app/                 /ops dashboard + /fabric twin + /sign-in + /api/ops/inc
 src/components/ops/      TopBar, MapShell, ExecSummary, AgentChip, Dispatch, lineage drawer
 src/lib/schema/          Zod + JSON Schema + eventId helpers
 src/lib/base-path.ts     env-driven `/aegisflow` prefix
-src/lib/ingest/          firms.ts · wind.ts (WeatherNext BigQuery) · weathernext.ts
+src/lib/ingest/          firms.ts · wind.ts (cache-first) · wind-cache.ts · weathernext.ts
 src/lib/regions.ts       El Salvador / WUI (default) + Cascade catalog
 src/lib/agents/          three stubs + OpenAI/DeepSeek/Modal runtime
 src/lib/pii.ts           crowdsource scrubber
@@ -130,6 +131,8 @@ fixtures/aegisfire-01.json
 docs/event-schema.md
 docs/regions.md
 docs/weathernext.md
+cloudflare-worker.ts     OpenNext fetch + WeatherNext KV cron
+scripts/ensure-wind-cache-kv.mjs
 workers/modal_stub.py
 workers/aegisflow-path/  Cloudflare path Worker (cortexmatter.com/aegisflow only)
 .github/workflows/cloudflare-prod.yml
@@ -157,7 +160,8 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
      - `FIRMS_MAP_KEY` — NASA FIRMS MAP key. Also uploaded as Wrangler secret `FIRMS_MAP_KEY` on Worker `aegisflow`.
      - `GCP_SA_JSON` — service-account JSON for GCP project `aegisflow-ieee-quest` (BigQuery Job User + Data Viewer on the WeatherNext Analytics Hub dataset). Wrangler secret `GCP_SA_JSON`.
    - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
-4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, deploys Worker `aegisflow` (uploads Clerk keys **and** ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON` as Worker secrets; path and WeatherNext dataset vars come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+4. **Actions → Cloudflare Prod → Run workflow** (or push a `prod-*` tag). The workflow runs `npm ci`, `npm test`, `npm run build` with `BASE_PATH=/aegisflow`, OpenNext-adapts the build, **creates/binds KV `WIND_CACHE`** (`scripts/ensure-wind-cache-kv.mjs`), deploys Worker `aegisflow` (uploads Clerk keys **and** ingest secrets `FIRMS_MAP_KEY` / `GCP_SA_JSON` as Worker secrets; path, WeatherNext dataset, and cron `*/8 * * * *` come from `wrangler.jsonc`), then deploys `workers/aegisflow-path`.
+   - If the KV step fails, the API token needs Workers KV edit, or Jaime runs `npx wrangler kv namespace create WIND_CACHE` once and pastes the id into `wrangler.jsonc`. See [`docs/weathernext.md`](docs/weathernext.md).
 5. **QA smoke**
    - `https://cortexmatter.com/` is **not** AegisFlow (other apps).
    - `https://cortexmatter.com/aegisflow` → Clerk sign-in (`/aegisflow/sign-in`) or `/aegisflow/ops` after auth. Must **not** be HTTP 500.

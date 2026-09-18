@@ -1,4 +1,5 @@
 import type { FeedComponent, WindTick } from "@/lib/schema";
+import type { FeedDisplay } from "@/lib/ui/status";
 
 /** Judge-facing degrade line — never interpolate BigQuery / timeout internals. */
 export const WIND_FALLBACK_DETAIL = "Wind · fallback";
@@ -20,6 +21,19 @@ export function isLiveWeatherNextWind(
 ): boolean {
   const source = typeof wind === "string" ? wind : wind.source;
   return source === "WEATHERNEXT";
+}
+
+/** TopBar chip: LIVE only when cached WEATHERNEXT cells are on the incident. */
+export function windChipDisplay(
+  status: FeedComponent["status"],
+  wind: Array<Pick<WindTick, "source">>,
+): FeedDisplay {
+  if (status === "down") return "Offline";
+  if (wind.some((w) => isLiveWeatherNextWind(w)) && status === "ok") {
+    return "Live";
+  }
+  if (status === "ok") return "Live";
+  return "Degraded";
 }
 
 export function windOverlayColor(
