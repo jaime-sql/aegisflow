@@ -18,10 +18,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-fund --no-audit
-      # Adapters must fixture-fallback. Do not provide live FIRMS / GCP keys in CI.
+      # Adapters must fixture-fallback. Do not provide live FIRMS / GCP / LLM / Modal keys in CI.
       - run: npm test
         env:
           FIRMS_MAP_KEY: ""
           GCP_SA_JSON: ""
           GOOGLE_APPLICATION_CREDENTIALS: ""
           AEGISFLOW_LIVE_WEATHERNEXT: "false"
+          OPENAI_API_KEY: ""
+          DEEPSEEK_API_KEY: ""
+          MODAL_ENDPOINT: ""
+          MODAL_TOKEN_ID: ""
+          MODAL_TOKEN_SECRET: ""
+          AEGISFLOW_LIVE_LLM: "false"

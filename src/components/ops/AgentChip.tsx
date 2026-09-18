@@ -1,5 +1,6 @@
 import type { AgentOutput } from "@/lib/schema";
-import { agentShortName } from "@/lib/ui/status";
+import { agentIsSim, agentShortName } from "@/lib/ui/status";
+import { SimBadge } from "./SimBadge";
 
 export function AgentChip({
   agent,
@@ -10,6 +11,7 @@ export function AgentChip({
   active: boolean;
   onSelect: () => void;
 }) {
+  const stub = agentIsSim(agent);
   return (
     <button
       type="button"
@@ -23,6 +25,7 @@ export function AgentChip({
       <span className="flex items-center gap-2 text-[12px]">
         <span className="h-1.5 w-1.5 rounded-full bg-[#FF4D2E]" />
         {agentShortName(agent.agentId)}
+        {stub ? <SimBadge /> : null}
       </span>
       <span className="font-mono text-[11px] text-[#8B9BB8]">
         conf {agent.confidence.toFixed(2)}

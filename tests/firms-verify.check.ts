@@ -71,6 +71,7 @@ async function probeZeroRowsStillLiveNotPainted() {
 
   const incident = await loadOpsIncident("el-salvador", {
     firms: { env: { FIRMS_MAP_KEY: "test-map-key" }, fetch: doFetch },
+    agents: { env: {} },
   });
   assert.equal(incident.hotspots[0]?.source, "NASA_FIRMS_FIXTURE");
   assert.equal(isFirmsDemoFixture(incident), true);

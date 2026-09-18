@@ -120,6 +120,11 @@ export const incidentJsonSchema = {
           minItems: 1,
           description: "Source eventIds that grounded this recommendation.",
         },
+        degraded: {
+          type: "boolean",
+          description:
+            "True when a live Modal/LLM attempt failed and fixture text was substituted. Omit on healthy fixture (no keys) and live success.",
+        },
       },
     },
     FeedHealth: {

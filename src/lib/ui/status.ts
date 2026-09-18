@@ -30,3 +30,11 @@ export function agentShortName(agentId: string): string {
   if (agentId === "resource-allocation") return "Resources";
   return agentId;
 }
+
+/** Stub / fixture fallback — mark the chip SIM like RF / Edge. */
+export function agentIsSim(agent: {
+  degraded?: boolean;
+  model: { used: string };
+}): boolean {
+  return agent.model.used === "fixture" || Boolean(agent.degraded);
+}

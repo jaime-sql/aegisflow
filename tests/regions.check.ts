@@ -238,16 +238,35 @@ function uiWiring() {
 }
 
 async function main() {
-  catalog();
-  remapKeepsClusterNotCenter();
-  await defaultLoadIsElSalvador();
-  await cascadeLoadKeepsFixtureCoords();
-  await firmsFixtureRemapsIntoElSalvador();
-  await firmsLiveMultipleCellsInElSalvador();
-  await windSqlUsesSelectedBbox();
-  await loadIncidentViaApiRegionParam();
-  uiWiring();
-  console.log("OK  region picker (El Salvador default + Cascade remap)");
+  const agentKeys = [
+    "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "MODAL_ENDPOINT",
+    "AEGISFLOW_LIVE_LLM",
+    "AEGISFLOW_FAIL_AGENTS",
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const key of agentKeys) {
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+  try {
+    catalog();
+    remapKeepsClusterNotCenter();
+    await defaultLoadIsElSalvador();
+    await cascadeLoadKeepsFixtureCoords();
+    await firmsFixtureRemapsIntoElSalvador();
+    await firmsLiveMultipleCellsInElSalvador();
+    await windSqlUsesSelectedBbox();
+    await loadIncidentViaApiRegionParam();
+    uiWiring();
+    console.log("OK  region picker (El Salvador default + Cascade remap)");
+  } finally {
+    for (const key of agentKeys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
 }
 
 main().catch((err) => {
