@@ -53,18 +53,13 @@ assert.match(wrangler, /\*\/8 \* \* \* \*/);
 const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
 assert.match(workflow, /command: deploy/);
 assert.match(workflow, /CLERK_SECRET_KEY/);
-assert.match(
-  workflow,
-  /secrets: \|[\s\S]*CLERK_SECRET_KEY[\s\S]*NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY[\s\S]*FIRMS_MAP_KEY[\s\S]*GCP_SA_JSON/,
-);
+assert.match(workflow, /scripts\/select-worker-secrets\.mjs/);
+assert.match(workflow, /steps\.worker_secrets\.outputs\.list/);
 assert.match(workflow, /FIRMS_MAP_KEY/);
 assert.match(workflow, /GCP_SA_JSON/);
 assert.match(workflow, /ensure-wind-cache-kv\.mjs/);
 assert.match(workflow, /ELEVENLABS_API_KEY/);
-assert.match(
-  workflow,
-  /secrets: \|[\s\S]*ELEVENLABS_API_KEY[\s\S]*ELEVENLABS_VOICE_ID/,
-);
+assert.match(workflow, /ELEVENLABS_VOICE_ID/);
 
 const pathWorker = readFileSync("workers/aegisflow-path/src/index.ts", "utf8");
 assert.match(pathWorker, /publicResponseHeaders/);

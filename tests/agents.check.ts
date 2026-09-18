@@ -388,6 +388,8 @@ function uiWiring() {
   assert.match(workflow, /OPENAI_API_KEY/);
   assert.match(workflow, /DEEPSEEK_API_KEY/);
   assert.match(workflow, /MODAL_TOKEN_SECRET/);
+  assert.match(workflow, /scripts\/select-worker-secrets\.mjs/);
+  assert.match(docs, /optional for Prod|optional on Cloudflare Prod/i);
   const ci = readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(ci, /OPENAI_API_KEY/);
 }

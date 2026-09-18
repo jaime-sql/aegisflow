@@ -88,7 +88,7 @@ python3 workers/modal_stub.py
 
 ### Cloudflare prod (`cortexmatter.com/aegisflow`)
 
-Jaime adds GitHub Actions secrets (agents often **cannot**):
+Jaime adds GitHub Actions secrets (agents often **cannot**). These are **optional for Prod** — Cloudflare Prod skips empty values instead of failing wrangler-action (`Value for secret … not found in environment`). Missing OpenAI/DeepSeek/Modal leaves AgentChip on **SIM**. Deploy does **not** require `OPENAI_API_KEY`.
 
 | Secret / var | Where |
 | --- | --- |
@@ -99,6 +99,6 @@ Jaime adds GitHub Actions secrets (agents often **cannot**):
 | `MODAL_ENDPOINT` | Actions variable **or** Wrangler var (the `*.modal.run` URL) |
 | `DEEPSEEK_BASE_URL` | Wrangler var (already defaulted) |
 
-Empty values keep Ops on the fixture path (same pattern as FIRMS / WeatherNext). After a Cloudflare Prod run, live chips show **confidence only**; stub chips show the **SIM** mark (RF/Edge token). Ops never blanks.
+Empty values keep Ops on the fixture path (same pattern as FIRMS / WeatherNext). After a Cloudflare Prod run, live chips show **confidence only**; stub chips show the **SIM** mark (RF/Edge token). Ops never blanks. Prod can run with only Clerk + ingest secrets (and ElevenLabs, if Jaime wants Brief aloud).
 
 Do **not** change Clerk or the Fabric stub in this phase.
