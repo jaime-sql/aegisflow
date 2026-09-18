@@ -118,6 +118,14 @@ function cliWritesGithubOutputAndExitsOnMissingClerk() {
   assert.equal(failed, true);
 }
 
+function nextBuildAcceptsPartialEnvMaps() {
+  const script = readFileSync("scripts/select-worker-secrets.mjs", "utf8");
+  assert.match(script, /@param \{NodeJS\.Dict<string>\}/);
+  assert.doesNotMatch(script, /@param \{NodeJS\.ProcessEnv\}/);
+  const tsconfig = readFileSync("tsconfig.json", "utf8");
+  assert.match(tsconfig, /"exclude"[\s\S]*"tests"/);
+}
+
 function workflowSkipsEmptyWranglerActionSecrets() {
   const workflow = readFileSync(".github/workflows/cloudflare-prod.yml", "utf8");
   assert.match(workflow, /scripts\/select-worker-secrets\.mjs/);
@@ -150,6 +158,7 @@ function main() {
   includesOptionalKeysWhenPresent();
   failsClosedWithoutClerk();
   cliWritesGithubOutputAndExitsOnMissingClerk();
+  nextBuildAcceptsPartialEnvMaps();
   workflowSkipsEmptyWranglerActionSecrets();
   console.log("OK  optional Cloudflare Prod Worker secrets (skip empty LLM / TTS keys)");
 }
