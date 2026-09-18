@@ -86,6 +86,12 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRD }}
           FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
 
+      - name: Ensure WeatherNext wind KV namespace
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '8a8c9483df8e8a2a9adec437a0994fe4' }}
+        run: node scripts/ensure-wind-cache-kv.mjs
+
       - name: Deploy OpenNext Worker (project aegisflow)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -97,6 +103,8 @@ jobs:
           # These are uploaded as Wrangler secrets on Worker `aegisflow`. Empty is OK;
           # adapters then serve AegisFire-01 fixtures and FeedBanner stays quiet.
           # Optional: `npx wrangler secret put FIRMS_MAP_KEY` / `npx wrangler secret put GCP_SA_JSON`
+          # WIND_CACHE KV: scripts/ensure-wind-cache-kv.mjs binds `aegisflow-WIND_CACHE`.
+          # If that step fails, Jaime: `npx wrangler kv namespace create WIND_CACHE`
           command: deploy
           secrets: |
             CLERK_SECRET_KEY

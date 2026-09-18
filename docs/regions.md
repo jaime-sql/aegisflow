@@ -36,7 +36,7 @@ Coverage is **national WUI + nearby highland fringe**, not a single demo cell. L
 | Bbox | `[-121.92, 44.12, -121.28, 44.52]` |
 | Center | `44.321, -121.548` (Sisters / Hwy 20) |
 
-This is the Stage 1 fixture region. Selecting it re-queries FIRMS + WeatherNext for that bbox and pans the same Leaflet map.
+This is the Stage 1 fixture region. Selecting it re-queries FIRMS for that bbox and pans the same Leaflet map. WeatherNext wind is **cache-only** on the request path (KV keys `wind:el-salvador` / `wind:cascade`); cron refreshes both picker regions every ~8 minutes. See [`docs/weathernext.md`](weathernext.md).
 
 ## Fixture fallback
 
