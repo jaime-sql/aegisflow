@@ -8,8 +8,10 @@ import { isFeedUnhealthy } from "../src/lib/ui/status";
 import {
   FIRMS_DEMO_CHIP_LABEL,
   FIRMS_DEMO_POPUP_LINE,
+  FIRMS_QUIET_CHIP_LABEL,
   hotspotPopupHtml,
   isFirmsDemoFixture,
+  isFirmsQuietLive,
 } from "../src/lib/ui/firms-demo";
 import type { Hotspot, IncidentEvent } from "../src/lib/schema";
 import type { IngestFetch } from "../src/lib/ingest/types";
@@ -65,12 +67,12 @@ function helperShowHide() {
   const emptyFixtureDetail = withHotspots(
     base,
     [],
-    "Live FIRMS returned 0 rows — using fixture",
+    "Live pull failed (FIRMS HTTP 403) — fixture in use",
   );
   const emptyLiveDetail = withHotspots(
     base,
     [],
-    "Live VIIRS_SNPP_NRT · 0 detections",
+    "Live SNPP+NOAA20+NOAA21 · 0 detections (quiet bbox)",
   );
 
   assert.equal(isFirmsDemoFixture(fixture), true, "fixture source must show chip");
@@ -111,7 +113,7 @@ function feedBannerUnchanged() {
         ? {
             ...f,
             status: "degraded",
-            detail: "Live FIRMS returned 0 rows — using fixture",
+            detail: "Live pull failed (FIRMS HTTP 403) — fixture in use",
           }
         : f,
     ),
@@ -161,9 +163,10 @@ async function ingestFixtureVsLive() {
     },
     agents: { env: {} },
   });
-  assert.equal(isFirmsDemoFixture(quietDay), true);
-  assert.equal(quietDay.hotspots[0]?.source, "NASA_FIRMS_FIXTURE");
-  assert.equal(isFeedUnhealthy(quietDay.feedHealth), true);
+  assert.equal(isFirmsDemoFixture(quietDay), false);
+  assert.equal(isFirmsQuietLive(quietDay), true);
+  assert.equal(quietDay.hotspots.length, 0);
+  assert.equal(isFeedUnhealthy(quietDay.feedHealth), false);
 
   const firmsLive = await fetchFirmsHotspots([-90.2, 13.1, -87.65, 14.48], {
     env: { FIRMS_MAP_KEY: "test-map-key" },
@@ -191,14 +194,22 @@ function uiWiring() {
   assert.match(map, /isFirmsDemoFixture\(incident\)/);
   assert.match(map, /hotspotPopupHtml/);
   assert.match(map, /firmsDemoFixture=\{isFirmsDemoFixture\(incident\)\}/);
+  assert.match(map, /role="switch"/);
+  assert.match(map, /aria-label="Toggle hotspots"/);
+  assert.match(map, /showHotspots/);
+  assert.match(map, /setShowHotspots/);
 
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   const weatherAt = stack.indexOf('<ExperimentalBadge label="WeatherNext" />');
   const chipAt = stack.indexOf("<DemoFixtureChip");
   assert.ok(weatherAt >= 0 && chipAt > weatherAt, "chip must sit under WeatherNext Experimental");
   assert.match(stack, /firmsDemoFixture \? <DemoFixtureChip/);
+  assert.match(stack, /QuietBboxChip/);
+  assert.match(stack, /firmsQuietLive/);
   assert.match(stack, /SimBadge label="RF"/);
   assert.match(stack, /SimBadge label="Edge"/);
+  assert.match(map, /isFirmsQuietLive/);
+  assert.equal(FIRMS_QUIET_CHIP_LABEL, "Hotspots · 0 LIVE");
 
   const chip = readFileSync("src/components/ops/DemoFixtureChip.tsx", "utf8");
   assert.match(chip, /FIRMS_DEMO_CHIP_LABEL/);
@@ -211,8 +222,10 @@ function uiWiring() {
   assert.equal(FIRMS_DEMO_POPUP_LINE, "Demo fixture · not live FIRMS");
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
-  assert.match(shell, /isFeedUnhealthy\(incident\.feedHealth\) &&/);
-  assert.match(shell, /FeedBanner health=\{incident\.feedHealth\}/);
+  assert.match(shell, /isFeedUnhealthy\(live\.feedHealth\) &&/);
+  assert.match(shell, /FeedBanner health=\{live\.feedHealth\}/);
+  assert.match(shell, /ingest-refresh/);
+  assert.match(shell, /applyIngestRefresh/);
 }
 
 async function main() {

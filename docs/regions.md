@@ -42,12 +42,20 @@ This is the Stage 1 fixture region. Selecting it re-queries FIRMS for that bbox 
 
 When `FIRMS_MAP_KEY` / `GCP_SA_JSON` are unset (CI, local, or Worker before secrets), adapters still return the AegisFire-01 hotspot/wind cluster so Ops never blanks. For El Salvador those points are **linearly remapped** into the SV bbox (relative cluster shape preserved). Cascade keeps native fixture coordinates. Live detections are never remapped.
 
+When `FIRMS_MAP_KEY` is set and the live multi-sensor pull succeeds with **0 rows**, Ops keeps an **empty hotspot layer** (chip: Hotspots · 0 LIVE). That is intentional honesty for judges — not a fixture rematch. Switch region or wait for an overpass; WMS underlay still paints any 24h FIRMS tiles in view when the key is present.
+
+## Live FIRMS stack
+
+Default products: `VIIRS_SNPP_NRT` + `VIIRS_NOAA20_NRT` + `VIIRS_NOAA21_NRT` (override with comma-separated `FIRMS_PRODUCT`). Default day range: **2** (`FIRMS_DAY_RANGE`, max 5). Detections are deduped by ~1 km cell + acquisition time.
+
 ## API
 
 ```
 GET /api/ops/incident              → default region (el-salvador)
 GET /api/ops/incident?region=el-salvador
 GET /api/ops/incident?region=cascade
+GET /api/ops/ingest-refresh?region=…  → FIRMS + wind only (Ops 3-min poll)
+GET /api/ops/firms-wms?…              → FIRMS WMS GetMap proxy (MAP_KEY server-side)
 ```
 
 Unknown `region` values fall back to El Salvador / WUI.

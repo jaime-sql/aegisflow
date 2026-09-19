@@ -63,6 +63,7 @@ function textResponse(body: string, status = 200): Response {
 const ENV_KEYS = [
   "FIRMS_MAP_KEY",
   "FIRMS_PRODUCT",
+  "FIRMS_DAY_RANGE",
   "GCP_SA_JSON",
   "GOOGLE_APPLICATION_CREDENTIALS",
   "GOOGLE_APPLICATION_CREDENTIALS_JSON",
@@ -136,10 +137,11 @@ async function firmsFixture() {
 }
 
 async function firmsLiveCsv() {
+  const urls: string[] = [];
   const doFetch: IngestFetch = async (input) => {
     const url = String(input);
+    urls.push(url);
     assert.match(url, /firms\.modaps\.eosdis\.nasa\.gov/);
-    assert.match(url, /VIIRS_SNPP_NRT/);
     return textResponse(FIRMS_CSV);
   };
   const result = await fetchFirmsHotspots(BBOX, {
@@ -153,6 +155,12 @@ async function firmsLiveCsv() {
   assert.equal(result.hotspots[0]?.confidence, "high");
   assert.equal(result.hotspots[1]?.confidence, "nominal");
   assert.match(result.hotspots[0]!.eventId, /^evt_aegisfire01_live_/);
+  assert.equal(urls.length, 3, "default stack pulls three VIIRS NRT products");
+  assert.ok(urls.some((u) => /VIIRS_SNPP_NRT/.test(u)));
+  assert.ok(urls.some((u) => /VIIRS_NOAA20_NRT/.test(u)));
+  assert.ok(urls.some((u) => /VIIRS_NOAA21_NRT/.test(u)));
+  assert.ok(urls.every((u) => /\/2$/.test(u) || /\/2\?/.test(u) || u.endsWith("/2")));
+  assert.match(result.health.detail, /SNPP\+NOAA20\+NOAA21/);
 }
 
 async function firmsHttpFail() {
@@ -172,9 +180,10 @@ async function firmsZeroRows() {
     fetch: async () =>
       textResponse("latitude,longitude,bright_ti4,acq_date,acq_time,confidence,frp\n"),
   });
-  assert.equal(result.usedFixture, true);
-  assert.equal(result.health.status, "degraded");
-  assert.match(result.health.detail, /0 rows/);
+  assert.equal(result.usedFixture, false);
+  assert.equal(result.hotspots.length, 0);
+  assert.equal(result.health.status, "ok");
+  assert.match(result.health.detail, /0 detections \(quiet bbox\)/);
 }
 
 async function windFixture() {

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
 import { PUBLIC_CROWD_COPY } from "@/lib/pii";
 import { withBasePath } from "@/lib/base-path";
-import { isFirmsDemoFixture, hotspotPopupHtml } from "@/lib/ui/firms-demo";
+import {
+  isFirmsDemoFixture,
+  isFirmsQuietLive,
+  hotspotPopupHtml,
+} from "@/lib/ui/firms-demo";
 import {
   isLiveWeatherNextWind,
   windOverlayColor,
@@ -14,6 +18,9 @@ import {
 import { MapLegendStack } from "./MapLegendStack";
 
 const leafletIconPath = withBasePath("/leaflet");
+
+/** FIRMS WMS 24h VIIRS layers (proxied; MAP_KEY stays server-side). */
+const FIRMS_WMS_LAYERS = "fires_viirs_snpp_24,fires_viirs_noaa20_24,fires_viirs_noaa21_24";
 
 function hotspotColor(confidence: Hotspot["confidence"]) {
   if (confidence === "high") return "#FF4D2E";
@@ -29,20 +36,26 @@ function windDest(w: WindTick): [number, number] {
   return [w.lat + dLat, w.lon + dLon];
 }
 
-function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
+function drawIncidentLayers(
+  group: L.LayerGroup,
+  incident: IncidentEvent,
+  opts: { showHotspots: boolean },
+) {
   group.clearLayers();
   const firmsDemoFixture = isFirmsDemoFixture(incident);
 
-  for (const h of incident.hotspots) {
-    L.circleMarker([h.lat, h.lon], {
-      radius: 5 + Math.min(h.brightnessK / 80, 8),
-      color: "#1a0e08",
-      weight: 1,
-      fillColor: hotspotColor(h.confidence),
-      fillOpacity: 0.9,
-    })
-      .bindPopup(hotspotPopupHtml(h, firmsDemoFixture))
-      .addTo(group);
+  if (opts.showHotspots) {
+    for (const h of incident.hotspots) {
+      L.circleMarker([h.lat, h.lon], {
+        radius: 5 + Math.min(h.brightnessK / 80, 8),
+        color: "#1a0e08",
+        weight: 1,
+        fillColor: hotspotColor(h.confidence),
+        fillOpacity: 0.9,
+      })
+        .bindPopup(hotspotPopupHtml(h, firmsDemoFixture))
+        .addTo(group);
+    }
   }
 
   for (const w of incident.wind) {
@@ -134,10 +147,30 @@ function fitRegion(map: L.Map, incident: IncidentEvent) {
   );
 }
 
-export function OpsMap({ incident }: { incident: IncidentEvent }) {
+function syncWmsVisibility(
+  map: L.Map,
+  wms: L.TileLayer.WMS | null,
+  show: boolean,
+) {
+  if (!wms) return;
+  const onMap = map.hasLayer(wms);
+  if (show && !onMap) wms.addTo(map);
+  if (!show && onMap) map.removeLayer(wms);
+}
+
+export function OpsMap({
+  incident,
+  firmsWmsEnabled = false,
+}: {
+  incident: IncidentEvent;
+  /** When true, add NASA FIRMS WMS underlay via server proxy. */
+  firmsWmsEnabled?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
+  const wmsRef = useRef<L.TileLayer.WMS | null>(null);
+  const [showHotspots, setShowHotspots] = useState(true);
 
   useEffect(() => {
     if (!ref.current || mapRef.current) return;
@@ -160,10 +193,24 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       maxZoom: 19,
     }).addTo(map);
 
+    if (firmsWmsEnabled) {
+      const wms = L.tileLayer.wms(withBasePath("/api/ops/firms-wms"), {
+        layers: FIRMS_WMS_LAYERS,
+        format: "image/png",
+        transparent: true,
+        version: "1.1.1",
+        opacity: 0.72,
+        attribution: "NASA FIRMS",
+        className: "ops-firms-wms",
+      } as L.WMSOptions);
+      wms.addTo(map);
+      wmsRef.current = wms;
+    }
+
     const layers = L.layerGroup().addTo(map);
     layersRef.current = layers;
     mapRef.current = map;
-    drawIncidentLayers(layers, incident);
+    drawIncidentLayers(layers, incident, { showHotspots: true });
     fitRegion(map, incident);
     setTimeout(() => map.invalidateSize(), 50);
 
@@ -171,8 +218,9 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       map.remove();
       mapRef.current = null;
       layersRef.current = null;
+      wmsRef.current = null;
     };
-    // Map instance is created once; overlays remap when `incident` changes.
+    // Map instance is created once; overlays remap when `incident` / toggle change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -180,10 +228,11 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
     const map = mapRef.current;
     const layers = layersRef.current;
     if (!map || !layers) return;
-    drawIncidentLayers(layers, incident);
+    drawIncidentLayers(layers, incident, { showHotspots });
+    syncWmsVisibility(map, wmsRef.current, showHotspots);
     fitRegion(map, incident);
     map.invalidateSize();
-  }, [incident]);
+  }, [incident, showHotspots]);
 
   return (
     <div className="relative h-full min-h-[320px] w-full">
@@ -193,9 +242,42 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
             Legend
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#FF4D2E]" /> Hotspot
-          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showHotspots}
+            aria-label="Toggle hotspots"
+            onClick={() => setShowHotspots((v) => !v)}
+            className="pointer-events-auto mb-1 flex w-full items-center justify-between gap-3 rounded border border-[#1E2A40] bg-[#0B1220]/80 px-2 py-1.5 text-left transition-colors hover:border-[#FF4D2E]/40"
+          >
+            <span className="flex items-center gap-2 text-[#E8EEF9]">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${showHotspots ? "bg-[#FF4D2E]" : "bg-[#8B9BB8]"}`}
+              />
+              Hotspots
+            </span>
+            <span
+              className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+                showHotspots ? "bg-[#FF4D2E]" : "bg-[#1E2A40]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#E8EEF9] transition-transform ${
+                  showHotspots ? "left-3.5" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
+          {firmsWmsEnabled ? (
+            <div
+              className={`flex items-center gap-2 ${showHotspots ? "text-[#E8EEF9]" : "text-[#8B9BB8]/70"}`}
+            >
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#FF4D2E]/55" /> FIRMS WMS
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#8B9BB8]">
+                {showHotspots ? "with hotspots" : "hidden"}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             <span
               className="h-0.5 w-4"
@@ -215,7 +297,10 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
             </div>
           )}
         </div>
-        <MapLegendStack firmsDemoFixture={isFirmsDemoFixture(incident)} />
+        <MapLegendStack
+          firmsDemoFixture={isFirmsDemoFixture(incident)}
+          firmsQuietLive={isFirmsQuietLive(incident)}
+        />
       </div>
       {incident.region.placeholder && (
         <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-[#FFB020]/40 bg-[#121A2B]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#FFB020]">
