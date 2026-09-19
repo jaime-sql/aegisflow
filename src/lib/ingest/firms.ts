@@ -7,6 +7,16 @@ import type { BBox, IngestFetch, IngestEnv } from "./types";
 /** Cap live detections per bbox; never collapse the set to a single demo point. */
 export const MAX_FIRMS_HOTSPOTS = 40;
 
+/** Default NRT stack — denser coverage than a single VIIRS bird (FIRMS Fire Map style). */
+export const DEFAULT_FIRMS_PRODUCTS = [
+  "VIIRS_SNPP_NRT",
+  "VIIRS_NOAA20_NRT",
+  "VIIRS_NOAA21_NRT",
+] as const;
+
+/** Default lookback days (FIRMS area API allows 1–5). */
+export const DEFAULT_FIRMS_DAY_RANGE = 2;
+
 export type FirmsResult = {
   hotspots: Hotspot[];
   health: FeedComponent;
@@ -44,9 +54,30 @@ function hotspotEventId(lat: number, lon: number, acquired: string, index: numbe
   return `evt_aegisfire01_live_${token}`.toLowerCase().slice(0, 80);
 }
 
-function firmsAreaUrl(bbox: BBox, key: string, product: string): string {
+export function resolveFirmsProducts(env: IngestEnv = process.env): string[] {
+  const raw = env.FIRMS_PRODUCT?.trim();
+  if (!raw) return [...DEFAULT_FIRMS_PRODUCTS];
+  const parts = raw
+    .split(/[,+\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [...DEFAULT_FIRMS_PRODUCTS];
+}
+
+export function resolveFirmsDayRange(env: IngestEnv = process.env): number {
+  const n = Number(env.FIRMS_DAY_RANGE ?? DEFAULT_FIRMS_DAY_RANGE);
+  if (!Number.isFinite(n)) return DEFAULT_FIRMS_DAY_RANGE;
+  return Math.min(5, Math.max(1, Math.floor(n)));
+}
+
+function firmsAreaUrl(
+  bbox: BBox,
+  key: string,
+  product: string,
+  dayRange: number,
+): string {
   const [west, south, east, north] = bbox;
-  return `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${product}/${west},${south},${east},${north}/1`;
+  return `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${product}/${west},${south},${east},${north}/${dayRange}`;
 }
 
 function countValidFirmsRows(text: string): number {
@@ -55,6 +86,57 @@ function countValidFirmsRows(text: string): number {
     const lon = Number(row.longitude);
     return Number.isFinite(lat) && Number.isFinite(lon);
   }).length;
+}
+
+function rowsToHotspots(text: string, product: string): Hotspot[] {
+  return parseCsv(text)
+    .map((row, index) => {
+      const lat = Number(row.latitude);
+      const lon = Number(row.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const date = row.acq_date || "1970-01-01";
+      const time = (row.acq_time || "0000").padStart(4, "0");
+      const observedAt = `${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000Z`;
+      const hotspot: Hotspot = {
+        eventId: hotspotEventId(lat, lon, `${date}${time}_${product}`, index),
+        schemaVersion: SCHEMA_VERSION,
+        lat,
+        lon,
+        brightnessK: Number(row.bright_ti4 || row.brightness || 0),
+        confidence: mapConfidence(row.confidence),
+        frpMw: Number(row.frp) || undefined,
+        observedAt,
+        satellite: row.satellite || product,
+        source: "NASA_FIRMS",
+      };
+      return hotspot;
+    })
+    .filter((h): h is Hotspot => h !== null);
+}
+
+/** Prefer higher FRP / brightness when sensors report the same cell. */
+function dedupeHotspots(hotspots: Hotspot[]): Hotspot[] {
+  const byKey = new Map<string, Hotspot>();
+  for (const h of hotspots) {
+    const key = `${h.lat.toFixed(3)}_${h.lon.toFixed(3)}_${h.observedAt}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, h);
+      continue;
+    }
+    const prevScore = (prev.frpMw ?? 0) + prev.brightnessK;
+    const nextScore = (h.frpMw ?? 0) + h.brightnessK;
+    if (nextScore > prevScore) byKey.set(key, h);
+  }
+  return [...byKey.values()];
+}
+
+function productLabel(products: string[]): string {
+  if (products.length === 1) return products[0]!;
+  const short = products.map((p) =>
+    p.replace(/_NRT$/i, "").replace(/^VIIRS_/i, ""),
+  );
+  return short.join("+");
 }
 
 export type FirmsProbeResult = {
@@ -72,6 +154,46 @@ export type FirmsVerifyResult = FirmsProbeResult & {
 
 function failProbe(error: string): FirmsProbeResult {
   return { live: false, rowCount: 0, summary: error, error };
+}
+
+type ProductPull =
+  | { ok: true; product: string; hotspots: Hotspot[]; rowCount: number }
+  | { ok: false; product: string; error: string };
+
+async function pullFirmsProduct(
+  bbox: BBox,
+  key: string,
+  product: string,
+  dayRange: number,
+  doFetch: IngestFetch,
+): Promise<ProductPull> {
+  try {
+    const res = await doFetch(firmsAreaUrl(bbox, key, product, dayRange), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      return { ok: false, product, error: `FIRMS HTTP ${res.status}` };
+    }
+    const text = await res.text();
+    if (/invalid|error|denied/i.test(text.slice(0, 200)) && !text.includes("latitude")) {
+      return {
+        ok: false,
+        product,
+        error: "FIRMS rejected MAP_KEY or returned an error body",
+      };
+    }
+    const hotspots = rowsToHotspots(text, product);
+    return {
+      ok: true,
+      product,
+      hotspots,
+      rowCount: countValidFirmsRows(text),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown FIRMS error";
+    return { ok: false, product, error: message };
+  }
 }
 
 /**
@@ -93,30 +215,23 @@ export async function probeFirms(
     return failProbe("no FIRMS_MAP_KEY");
   }
 
-  const product = env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
-  try {
-    const res = await doFetch(firmsAreaUrl(bbox, key, product), {
-      cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!res.ok) {
-      throw new Error(`FIRMS HTTP ${res.status}`);
-    }
-    const text = await res.text();
-    if (/invalid|error|denied/i.test(text.slice(0, 200)) && !text.includes("latitude")) {
-      throw new Error("FIRMS rejected MAP_KEY or returned an error body");
-    }
-    const rowCount = countValidFirmsRows(text);
-    return {
-      live: true,
-      rowCount,
-      summary: `${rowCount} rows · LIVE`,
-      error: null,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown FIRMS error";
-    return failProbe(message);
+  const products = resolveFirmsProducts(env);
+  const dayRange = resolveFirmsDayRange(env);
+  const pulls = await Promise.all(
+    products.map((product) => pullFirmsProduct(bbox, key, product, dayRange, doFetch)),
+  );
+  const okPulls = pulls.filter((p): p is Extract<ProductPull, { ok: true }> => p.ok);
+  if (okPulls.length === 0) {
+    const first = pulls.find((p) => !p.ok);
+    return failProbe(first && !first.ok ? first.error : "FIRMS pull failed");
   }
+  const rowCount = okPulls.reduce((sum, p) => sum + p.rowCount, 0);
+  return {
+    live: true,
+    rowCount,
+    summary: `${rowCount} rows · LIVE`,
+    error: null,
+  };
 }
 
 function fixtureHotspotsForBbox(bbox: BBox): Hotspot[] {
@@ -124,8 +239,9 @@ function fixtureHotspotsForBbox(bbox: BBox): Hotspot[] {
 }
 
 /**
- * NASA FIRMS area CSV. Falls back to AegisFire-01 fixture when FIRMS_MAP_KEY
- * is missing or the request fails (graceful degrade).
+ * NASA FIRMS area CSV across one or more NRT products. Falls back to
+ * AegisFire-01 fixture when FIRMS_MAP_KEY is missing or every product fails.
+ * Quiet live days return an empty hotspot list (honest empty — not fixture).
  * Docs: https://firms.modaps.eosdis.nasa.gov/api/area/
  */
 export async function fetchFirmsHotspots(
@@ -166,73 +282,18 @@ export async function fetchFirmsHotspots(
     };
   }
 
-  const product = env.FIRMS_PRODUCT?.trim() || "VIIRS_SNPP_NRT";
+  const products = resolveFirmsProducts(env);
+  const dayRange = resolveFirmsDayRange(env);
+  const label = productLabel(products);
 
-  try {
-    const res = await doFetch(firmsAreaUrl(bbox, key, product), {
-      cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!res.ok) {
-      throw new Error(`FIRMS HTTP ${res.status}`);
-    }
-    const text = await res.text();
-    if (/invalid|error|denied/i.test(text.slice(0, 200)) && !text.includes("latitude")) {
-      throw new Error("FIRMS rejected MAP_KEY or returned an error body");
-    }
-    const rows = parseCsv(text);
-    const hotspots: Hotspot[] = rows
-      .map((row, index) => {
-        const lat = Number(row.latitude);
-        const lon = Number(row.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-        const date = row.acq_date || "1970-01-01";
-        const time = (row.acq_time || "0000").padStart(4, "0");
-        const observedAt = `${date}T${time.slice(0, 2)}:${time.slice(2, 4)}:00.000Z`;
-        const hotspot: Hotspot = {
-          eventId: hotspotEventId(lat, lon, `${date}${time}`, index),
-          schemaVersion: SCHEMA_VERSION,
-          lat,
-          lon,
-          brightnessK: Number(row.bright_ti4 || row.brightness || 0),
-          confidence: mapConfidence(row.confidence),
-          frpMw: Number(row.frp) || undefined,
-          observedAt,
-          satellite: row.satellite || undefined,
-          source: "NASA_FIRMS",
-        };
-        return hotspot;
-      })
-      .filter((h): h is Hotspot => h !== null)
-      .slice(0, MAX_FIRMS_HOTSPOTS);
+  const pulls = await Promise.all(
+    products.map((product) => pullFirmsProduct(bbox, key, product, dayRange, doFetch)),
+  );
+  const okPulls = pulls.filter((p): p is Extract<ProductPull, { ok: true }> => p.ok);
+  const failPulls = pulls.filter((p): p is Extract<ProductPull, { ok: false }> => !p.ok);
 
-    if (hotspots.length === 0) {
-      return {
-        hotspots: fixture,
-        usedFixture: true,
-        health: {
-          id: "firms",
-          label: "NASA FIRMS",
-          status: "degraded",
-          detail: "Live FIRMS returned 0 rows — using fixture",
-          lastSuccessAt: now,
-        },
-      };
-    }
-
-    return {
-      hotspots,
-      usedFixture: false,
-      health: {
-        id: "firms",
-        label: "NASA FIRMS",
-        status: "ok",
-        detail: `Live ${product} · ${hotspots.length} detections`,
-        lastSuccessAt: now,
-      },
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown FIRMS error";
+  if (okPulls.length === 0) {
+    const message = failPulls[0]?.error ?? "unknown FIRMS error";
     return {
       hotspots: fixture.map((h) => ({ ...h, degraded: true })),
       usedFixture: true,
@@ -245,6 +306,40 @@ export async function fetchFirmsHotspots(
       },
     };
   }
+
+  const hotspots = dedupeHotspots(okPulls.flatMap((p) => p.hotspots)).slice(
+    0,
+    MAX_FIRMS_HOTSPOTS,
+  );
+
+  const partialNote =
+    failPulls.length > 0 ? ` · ${failPulls.length} sensor(s) failed` : "";
+
+  if (hotspots.length === 0) {
+    return {
+      hotspots: [],
+      usedFixture: false,
+      health: {
+        id: "firms",
+        label: "NASA FIRMS",
+        status: "ok",
+        detail: `Live ${label} · 0 detections (quiet bbox)${partialNote}`,
+        lastSuccessAt: now,
+      },
+    };
+  }
+
+  return {
+    hotspots,
+    usedFixture: false,
+    health: {
+      id: "firms",
+      label: "NASA FIRMS",
+      status: failPulls.length > 0 ? "degraded" : "ok",
+      detail: `Live ${label} · ${hotspots.length} detections${partialNote}`,
+      lastSuccessAt: now,
+    },
+  };
 }
 
 /** Probe the active Ops region bbox. Result is diagnostic JSON only — no map dots. */

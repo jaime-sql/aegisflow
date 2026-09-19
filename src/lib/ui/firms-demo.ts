@@ -3,12 +3,16 @@ import type { Hotspot, IncidentEvent } from "@/lib/schema";
 /** Map legend chip copy — judges must see fixture hotspots are not live FIRMS. */
 export const FIRMS_DEMO_CHIP_LABEL = "Hotspots · DEMO FIXTURE";
 
+/** Shown when live FIRMS succeeded but the active bbox has no detections. */
+export const FIRMS_QUIET_CHIP_LABEL = "Hotspots · 0 LIVE";
+
 /** First line of a hotspot popup when the FIRMS feed is on the remapped fixture. */
 export const FIRMS_DEMO_POPUP_LINE = "Demo fixture · not live FIRMS";
 
 /**
- * True when Ops is plotting the AegisFire-01 fixture (quiet day / 0 live rows /
- * missing key / adapter failure), not live NASA FIRMS detections.
+ * True when Ops is plotting the AegisFire-01 fixture (missing key / adapter
+ * failure), not live NASA FIRMS detections. Quiet live days are empty maps —
+ * not this chip.
  *
  * Live rows always carry `source: "NASA_FIRMS"`; fixture fallback rows carry
  * `NASA_FIRMS_FIXTURE`. Cascade ↔ El Salvador remap keeps those source tags.
@@ -24,6 +28,16 @@ export function isFirmsDemoFixture(
   }
   const firms = incident.feedHealth.feeds.find((f) => f.id === "firms");
   return /fixture/i.test(firms?.detail ?? "");
+}
+
+/** Live FIRMS pull succeeded with zero detections in the active bbox. */
+export function isFirmsQuietLive(
+  incident: Pick<IncidentEvent, "hotspots" | "feedHealth">,
+): boolean {
+  if (isFirmsDemoFixture(incident)) return false;
+  if (incident.hotspots.length > 0) return false;
+  const firms = incident.feedHealth.feeds.find((f) => f.id === "firms");
+  return /0 detections|quiet bbox/i.test(firms?.detail ?? "");
 }
 
 export function hotspotPopupHtml(

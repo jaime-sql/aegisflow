@@ -107,7 +107,9 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `CLERK_*` / `NEXT_PUBLIC_CLERK_*` | Auth. Empty → DEV bypass. Prod paths are `/aegisflow/sign-in` etc. |
 | `BASE_PATH` / `CLOUDFLARE_PROD` | Prod `basePath` / `assetPrefix` = `/aegisflow`. Unset locally. |
 | `AEGISFLOW_ORIGIN` | Path Worker only. Service-bind dest = OpenNext `workers.dev` origin (never the inbound Host). |
-| `FIRMS_MAP_KEY` | NASA FIRMS area API. Empty → fixture hotspots remapped into the selected bbox. Wrangler secret on Worker `aegisflow`. |
+| `FIRMS_MAP_KEY` | NASA FIRMS area API + WMS proxy. Empty → fixture hotspots remapped into the selected bbox. Quiet live (0 detections) → empty map, not fixture. Wrangler secret on Worker `aegisflow`. |
+| `FIRMS_PRODUCT` | Optional comma-separated products (default SNPP+NOAA20+NOAA21 NRT). |
+| `FIRMS_DAY_RANGE` | Optional 1–5 day lookback (default **2**). |
 | `GCP_SA_JSON` | GCP service-account JSON for project `aegisflow-ieee-quest`. Empty → fixture wind. Wrangler secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` / `_JSON` | Local ADC alternative to `GCP_SA_JSON` (file path or JSON). Never commit. |
 | `GCP_PROJECT_ID` / `WEATHERNEXT_BQ_DATASET` | BigQuery project (default `aegisflow-ieee-quest`) and Analytics Hub linked dataset (default `weathernext`). |

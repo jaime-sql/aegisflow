@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  fetchFirmsHotspots,
   probeFirms,
   verifyFirmsForRegion,
 } from "../src/lib/ingest/firms";
@@ -37,9 +36,9 @@ function assertNoMapDots(payload: object) {
 }
 
 async function probeTwelveRowsLive() {
-  let requested: string | undefined;
+  const urls: string[] = [];
   const doFetch: IngestFetch = async (input) => {
-    requested = String(input);
+    urls.push(String(input));
     return textResponse(firmsCsv(12));
   };
   const result = await verifyFirmsForRegion("el-salvador", {
@@ -47,14 +46,14 @@ async function probeTwelveRowsLive() {
     fetch: doFetch,
   });
   assert.equal(result.live, true);
-  assert.equal(result.rowCount, 12);
-  assert.equal(result.summary, "12 rows · LIVE");
+  assert.equal(result.rowCount, 36, "12 rows × 3 default NRT products");
+  assert.equal(result.summary, "36 rows · LIVE");
   assert.equal(result.error, null);
   assert.equal(result.regionId, "el-salvador");
   assert.deepEqual(result.bbox, EL_SALVADOR_BBOX);
-  assert.ok(requested);
-  assert.match(requested!, /firms\.modaps\.eosdis\.nasa.gov/);
-  assert.match(requested!, /-90\.2,13\.1,-87\.65,14\.48/);
+  assert.equal(urls.length, 3);
+  assert.ok(urls.every((u) => /firms\.modaps\.eosdis\.nasa\.gov/.test(u)));
+  assert.ok(urls.every((u) => /-90\.2,13\.1,-87\.65,14\.48/.test(u)));
   assertNoMapDots(result);
 }
 
@@ -73,8 +72,8 @@ async function probeZeroRowsStillLiveNotPainted() {
     firms: { env: { FIRMS_MAP_KEY: "test-map-key" }, fetch: doFetch },
     agents: { env: {} },
   });
-  assert.equal(incident.hotspots[0]?.source, "NASA_FIRMS_FIXTURE");
-  assert.equal(isFirmsDemoFixture(incident), true);
+  assert.equal(incident.hotspots.length, 0);
+  assert.equal(isFirmsDemoFixture(incident), false);
 }
 
 async function probeUsesActiveRegionBbox() {
@@ -89,8 +88,9 @@ async function probeUsesActiveRegionBbox() {
   });
   assert.equal(cascade.regionId, "cascade");
   assert.deepEqual(cascade.bbox, CASCADE_BBOX);
-  assert.equal(cascade.summary, "1 rows · LIVE");
-  assert.match(urls[0]!, /-121\.92,44\.12,-121\.28,44\.52/);
+  assert.equal(cascade.summary, "3 rows · LIVE");
+  assert.equal(urls.length, 3);
+  assert.ok(urls.every((u) => /-121\.92,44\.12,-121\.28,44\.52/.test(u)));
 }
 
 async function probeErrorsAreClear() {
@@ -140,10 +140,12 @@ function uiWiring() {
   assert.doesNotMatch(map, /firms-verify/);
   assert.doesNotMatch(map, /probeFirms/);
   assert.match(map, /isFirmsDemoFixture\(incident\)/);
+  assert.match(map, /firms-wms/);
 
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.doesNotMatch(shell, /firms-verify/);
   assert.doesNotMatch(shell, /onRegionChange/);
+  assert.match(shell, /ingest-refresh/);
 }
 
 async function main() {
@@ -152,7 +154,7 @@ async function main() {
   await probeUsesActiveRegionBbox();
   await probeErrorsAreClear();
   uiWiring();
-  console.log("OK  Verify FIRMS probe (no map dots, DEMO FIXTURE stays on fixture)");
+  console.log("OK  Verify FIRMS probe (no map dots; quiet live stays empty)");
 }
 
 main().catch((err) => {

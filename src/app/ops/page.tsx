@@ -23,6 +23,7 @@ export default async function OpsPage({
       session={session}
       regionPicker={<RegionPicker regionId={incident.region.id} />}
       ttsConfigured={isElevenLabsConfigured()}
+      firmsWmsEnabled={Boolean(process.env.FIRMS_MAP_KEY?.trim())}
     />
   );
 }
