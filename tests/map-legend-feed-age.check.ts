@@ -193,20 +193,21 @@ function countsMatchIncidentArrays() {
 
 function agentAnchorsUseRealLineage() {
   const fixture = cloneFixtureIncident();
+  const seen = new Set<string>();
   for (const agent of fixture.agents) {
     const anchor = agentMapAnchor(agent, fixture);
     assert.ok(Number.isFinite(anchor.lat) && Number.isFinite(anchor.lon));
-    const ids = new Set(agent.lineage.map((l) => l.eventId));
-    const pts = [
-      ...fixture.hotspots.filter((h) => ids.has(h.eventId)),
-      ...fixture.wind.filter((w) => ids.has(w.eventId)),
-    ];
-    assert.ok(pts.length > 0, `${agent.agentId} must cite a mapped hotspot/wind`);
-    const meanLat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
-    const meanLon = pts.reduce((s, p) => s + p.lon, 0) / pts.length;
-    const dLat = Math.abs(anchor.lat - meanLat);
-    const dLon = Math.abs(anchor.lon - meanLon);
-    assert.ok(dLat < 0.02 && dLon < 0.02, "nudge stays on the incident, not a fake city");
+    const mapped = [
+      ...fixture.hotspots.map((h) => ({ lat: h.lat, lon: h.lon, eventId: h.eventId })),
+      ...fixture.wind.map((w) => ({ lat: w.lat, lon: w.lon, eventId: w.eventId })),
+    ].filter((p) => p.lat === anchor.lat && p.lon === anchor.lon);
+    assert.ok(
+      mapped.length > 0,
+      `${agent.agentId} must sit on a real hotspot/wind already on the map`,
+    );
+    const key = `${anchor.lat},${anchor.lon}`;
+    assert.equal(seen.has(key), false, `${agent.agentId} must not stack on another agent`);
+    seen.add(key);
   }
 }
 

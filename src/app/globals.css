@@ -85,8 +85,8 @@ body {
 
 .ops-agent-diamond {
   display: flex;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   border: 2px solid #3db9ff;

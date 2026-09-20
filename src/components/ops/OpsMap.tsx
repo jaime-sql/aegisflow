@@ -95,11 +95,12 @@ function drawAgents(group: L.LayerGroup, incident: IncidentEvent) {
     const { lat, lon } = agentMapAnchor(agent, incident);
     const letter = agentMarkerLetter(agent.agentId);
     L.marker([lat, lon], {
+      zIndexOffset: 420,
       icon: L.divIcon({
         className: "ops-agent-marker",
         html: `<div class="ops-agent-diamond"><span>${letter}</span></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
       }),
     })
       .bindPopup(agentPopupHtml(agent))

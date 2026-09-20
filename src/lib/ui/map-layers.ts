@@ -33,43 +33,49 @@ export function mapLayerCounts(
   };
 }
 
-const AGENT_NUDGE_RAD_M = 0.006;
+function lineageMappedPoints(
+  agent: Pick<AgentOutput, "lineage">,
+  incident: Pick<IncidentEvent, "hotspots" | "wind">,
+): Array<{ lat: number; lon: number }> {
+  const points: Array<{ lat: number; lon: number }> = [];
+  for (const row of agent.lineage) {
+    const hotspot = incident.hotspots.find((h) => h.eventId === row.eventId);
+    if (hotspot) {
+      points.push({ lat: hotspot.lat, lon: hotspot.lon });
+      continue;
+    }
+    const wind = incident.wind.find((w) => w.eventId === row.eventId);
+    if (wind) points.push({ lat: wind.lat, lon: wind.lon });
+  }
+  return points;
+}
+
+function fallbackAnchor(
+  incident: Pick<IncidentEvent, "hotspots" | "wind" | "region">,
+): { lat: number; lon: number } {
+  const pt = incident.hotspots[0] ?? incident.wind[0];
+  if (pt) return { lat: pt.lat, lon: pt.lon };
+  return { lat: incident.region.center.lat, lon: incident.region.center.lon };
+}
 
 /**
- * Place an agent marker on real lineage coordinates (hotspot / wind eventIds
- * already on the incident). A ~600 m cartographic nudge keeps the three
- * diamonds from stacking when they share a centroid — not a fake location.
+ * Place an agent marker on a real hotspot/wind already on the incident.
+ * Each agent picks a different lineage point so the three diamonds stay
+ * distinct without inventing coordinates.
  */
 export function agentMapAnchor(
   agent: Pick<AgentOutput, "agentId" | "lineage">,
   incident: Pick<IncidentEvent, "hotspots" | "wind" | "region">,
 ): { lat: number; lon: number } {
-  const ids = new Set(agent.lineage.map((row) => row.eventId));
-  const pts = [
-    ...incident.hotspots.filter((h) => ids.has(h.eventId)),
-    ...incident.wind.filter((w) => ids.has(w.eventId)),
-  ];
-  const fallback = incident.hotspots[0] ?? incident.wind[0];
-  const base = pts.length
-    ? {
-        lat: pts.reduce((sum, p) => sum + p.lat, 0) / pts.length,
-        lon: pts.reduce((sum, p) => sum + p.lon, 0) / pts.length,
-      }
-    : fallback
-      ? { lat: fallback.lat, lon: fallback.lon }
-      : { lat: incident.region.center.lat, lon: incident.region.center.lon };
-
-  const index =
-    agent.agentId === "fire-propagation"
-      ? 0
-      : agent.agentId === "evacuation"
-        ? 1
-        : 2;
-  const angle = (index * 2 * Math.PI) / 3;
-  return {
-    lat: base.lat + AGENT_NUDGE_RAD_M * Math.cos(angle),
-    lon: base.lon + AGENT_NUDGE_RAD_M * Math.sin(angle),
-  };
+  const points = lineageMappedPoints(agent, incident);
+  if (points.length === 0) return fallbackAnchor(incident);
+  if (agent.agentId === "evacuation") {
+    return points[1] ?? points[0];
+  }
+  if (agent.agentId === "resource-allocation") {
+    return points.at(-1) ?? points[0];
+  }
+  return points[0];
 }
 
 export function agentMarkerLetter(
