@@ -223,8 +223,9 @@ function uiWiring() {
   assert.match(map, /#3DB9FF/);
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   assert.match(stack, /ExperimentalBadge/);
-  assert.match(stack, /SimBadge label="RF"/);
+  assert.match(stack, /Hotspots/);
   assert.match(stack, /DemoFixtureChip/);
+  assert.doesNotMatch(stack, /SimBadge label="RF"/);
 
   const route = readFileSync("src/app/api/ops/incident/route.ts", "utf8");
   assert.match(route, /searchParams\.get\("region"\)/);
