@@ -77,3 +77,27 @@ body {
 .ops-dark-tiles {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05) saturate(0.35);
 }
+
+.ops-agent-marker {
+  background: none;
+  border: none;
+}
+
+.ops-agent-diamond {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #3db9ff;
+  background: #121a2b;
+  transform: rotate(45deg);
+}
+
+.ops-agent-diamond span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  line-height: 1;
+  color: #e8eef9;
+  transform: rotate(-45deg);
+}

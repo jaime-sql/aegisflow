@@ -612,6 +612,8 @@ function uiWiring() {
   assert.match(top, /windChipDisplay/);
   assert.match(top, /windChipFeedStatus/);
   assert.match(top, /FirmsVerifyButton/);
+  assert.match(top, /SimBadge label="RF"/);
+  assert.match(top, /SimBadge label="Edge"/);
   assert.doesNotMatch(top, /disabled=/);
   assert.doesNotMatch(top, /onRegionChange/);
   const picker = readFileSync("src/components/ops/RegionPicker.tsx", "utf8");
@@ -620,9 +622,10 @@ function uiWiring() {
   assert.match(picker, /onchange="this\.form\.submit\(\)"/);
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   assert.match(stack, /ExperimentalBadge/);
-  assert.match(stack, /SimBadge label="RF"/);
-  assert.match(stack, /SimBadge label="Edge"/);
+  assert.match(stack, /Hotspots/);
+  assert.match(stack, /Agents/);
   assert.match(stack, /DemoFixtureChip/);
+  assert.doesNotMatch(stack, /SimBadge label="RF"/);
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.match(shell, /FeedBanner/);
   assert.match(shell, /65%/);

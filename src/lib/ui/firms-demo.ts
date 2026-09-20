@@ -3,6 +3,9 @@ import type { Hotspot, IncidentEvent } from "@/lib/schema";
 /** Map legend chip copy — judges must see fixture hotspots are not live FIRMS. */
 export const FIRMS_DEMO_CHIP_LABEL = "Hotspots · DEMO FIXTURE";
 
+/** Compact honesty token for the feed-age line (`FIRMS · 4m ago · DEMO FIXTURE`). */
+export const FIRMS_DEMO_STATUS = "DEMO FIXTURE";
+
 /** First line of a hotspot popup when the FIRMS feed is on the remapped fixture. */
 export const FIRMS_DEMO_POPUP_LINE = "Demo fixture · not live FIRMS";
 

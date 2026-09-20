@@ -188,17 +188,31 @@ async function ingestFixtureVsLive() {
 function uiWiring() {
   const map = readFileSync("src/components/ops/OpsMap.tsx", "utf8");
   assert.match(map, /MapLegendStack/);
-  assert.match(map, /isFirmsDemoFixture\(incident\)/);
+  assert.match(map, /isFirmsDemoFixture/);
   assert.match(map, /hotspotPopupHtml/);
-  assert.match(map, /firmsDemoFixture=\{isFirmsDemoFixture\(incident\)\}/);
+  assert.match(map, /drawHotspots/);
+  assert.match(map, /drawWind/);
+  assert.match(map, /drawAgents/);
+  assert.match(map, /onToggle/);
+  assert.doesNotMatch(map, /drawOsint|drawCctv|drawFlights/);
 
   const stack = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
-  const weatherAt = stack.indexOf('<ExperimentalBadge label="WeatherNext" />');
+  const hotspotsAt = stack.indexOf("Hotspots");
   const chipAt = stack.indexOf("<DemoFixtureChip");
-  assert.ok(weatherAt >= 0 && chipAt > weatherAt, "chip must sit under WeatherNext Experimental");
-  assert.match(stack, /firmsDemoFixture \? <DemoFixtureChip/);
-  assert.match(stack, /SimBadge label="RF"/);
-  assert.match(stack, /SimBadge label="Edge"/);
+  const weatherAt = stack.indexOf('<ExperimentalBadge label="WeatherNext" />');
+  assert.ok(
+    hotspotsAt >= 0 && chipAt > hotspotsAt && weatherAt > chipAt,
+    "toggles, then feed-age DEMO FIXTURE chip, then WeatherNext Experimental",
+  );
+  assert.match(stack, /MAP_LAYER_LABELS/);
+  assert.match(stack, /DemoFixtureChip label=\{FIRMS_DEMO_STATUS\}/);
+  assert.match(stack, /Wind · fallback/);
+  assert.match(stack, /Wind · LIVE/);
+  assert.doesNotMatch(stack, /SimBadge/);
+
+  const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
+  assert.match(top, /SimBadge label="RF"/);
+  assert.match(top, /SimBadge label="Edge"/);
 
   const chip = readFileSync("src/components/ops/DemoFixtureChip.tsx", "utf8");
   assert.match(chip, /FIRMS_DEMO_CHIP_LABEL/);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Hotspot, IncidentEvent, WindTick } from "@/lib/schema";
@@ -11,9 +11,22 @@ import {
   isLiveWeatherNextWind,
   windOverlayColor,
 } from "@/lib/ui/wind-feed";
+import {
+  DEFAULT_LAYER_VISIBILITY,
+  MAP_LAYER_KEYS,
+  agentMapAnchor,
+  agentMarkerLetter,
+  agentPopupHtml,
+  type MapLayerKey,
+  type MapLayerVisibility,
+} from "@/lib/ui/map-layers";
 import { MapLegendStack } from "./MapLegendStack";
 
 const leafletIconPath = withBasePath("/leaflet");
+
+type LayerGroups = Record<MapLayerKey, L.LayerGroup> & {
+  extras: L.LayerGroup;
+};
 
 function hotspotColor(confidence: Hotspot["confidence"]) {
   if (confidence === "high") return "#FF4D2E";
@@ -29,10 +42,9 @@ function windDest(w: WindTick): [number, number] {
   return [w.lat + dLat, w.lon + dLon];
 }
 
-function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
+function drawHotspots(group: L.LayerGroup, incident: IncidentEvent) {
   group.clearLayers();
   const firmsDemoFixture = isFirmsDemoFixture(incident);
-
   for (const h of incident.hotspots) {
     L.circleMarker([h.lat, h.lon], {
       radius: 5 + Math.min(h.brightnessK / 80, 8),
@@ -44,7 +56,10 @@ function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
       .bindPopup(hotspotPopupHtml(h, firmsDemoFixture))
       .addTo(group);
   }
+}
 
+function drawWind(group: L.LayerGroup, incident: IncidentEvent) {
+  group.clearLayers();
   for (const w of incident.wind) {
     const dest = windDest(w);
     const color = windOverlayColor(w);
@@ -72,7 +87,29 @@ function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
       )
       .addTo(group);
   }
+}
 
+function drawAgents(group: L.LayerGroup, incident: IncidentEvent) {
+  group.clearLayers();
+  for (const agent of incident.agents) {
+    const { lat, lon } = agentMapAnchor(agent, incident);
+    const letter = agentMarkerLetter(agent.agentId);
+    L.marker([lat, lon], {
+      icon: L.divIcon({
+        className: "ops-agent-marker",
+        html: `<div class="ops-agent-diamond"><span>${letter}</span></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      }),
+    })
+      .bindPopup(agentPopupHtml(agent))
+      .addTo(group);
+  }
+}
+
+/** RF SIM + Cascade corridor / crowd — always on, not legend toggles. */
+function drawExtras(group: L.LayerGroup, incident: IncidentEvent) {
+  group.clearLayers();
   L.circleMarker(
     [incident.region.center.lat + 0.04, incident.region.center.lon - 0.06],
     {
@@ -122,6 +159,26 @@ function drawIncidentLayers(group: L.LayerGroup, incident: IncidentEvent) {
   }
 }
 
+function drawIncidentLayers(groups: LayerGroups, incident: IncidentEvent) {
+  drawHotspots(groups.hotspots, incident);
+  drawWind(groups.wind, incident);
+  drawAgents(groups.agents, incident);
+  drawExtras(groups.extras, incident);
+}
+
+function applyLayerVisibility(
+  map: L.Map,
+  groups: LayerGroups,
+  visible: MapLayerVisibility,
+) {
+  for (const key of MAP_LAYER_KEYS) {
+    const group = groups[key];
+    const on = visible[key];
+    if (on && !map.hasLayer(group)) group.addTo(map);
+    if (!on && map.hasLayer(group)) map.removeLayer(group);
+  }
+}
+
 function fitRegion(map: L.Map, incident: IncidentEvent) {
   const [west, south, east, north] = incident.region.bbox;
   const maxZoom = incident.region.id === "el-salvador" ? 9 : 12;
@@ -137,7 +194,12 @@ function fitRegion(map: L.Map, incident: IncidentEvent) {
 export function OpsMap({ incident }: { incident: IncidentEvent }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const layersRef = useRef<L.LayerGroup | null>(null);
+  const groupsRef = useRef<LayerGroups | null>(null);
+  const [visible, setVisible] = useState<MapLayerVisibility>(
+    DEFAULT_LAYER_VISIBILITY,
+  );
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
   useEffect(() => {
     if (!ref.current || mapRef.current) return;
@@ -160,17 +222,23 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       maxZoom: 19,
     }).addTo(map);
 
-    const layers = L.layerGroup().addTo(map);
-    layersRef.current = layers;
+    const groups: LayerGroups = {
+      hotspots: L.layerGroup(),
+      wind: L.layerGroup(),
+      agents: L.layerGroup(),
+      extras: L.layerGroup().addTo(map),
+    };
+    groupsRef.current = groups;
     mapRef.current = map;
-    drawIncidentLayers(layers, incident);
+    drawIncidentLayers(groups, incident);
+    applyLayerVisibility(map, groups, DEFAULT_LAYER_VISIBILITY);
     fitRegion(map, incident);
     setTimeout(() => map.invalidateSize(), 50);
 
     return () => {
       map.remove();
       mapRef.current = null;
-      layersRef.current = null;
+      groupsRef.current = null;
     };
     // Map instance is created once; overlays remap when `incident` changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,44 +246,34 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
 
   useEffect(() => {
     const map = mapRef.current;
-    const layers = layersRef.current;
-    if (!map || !layers) return;
-    drawIncidentLayers(layers, incident);
+    const groups = groupsRef.current;
+    if (!map || !groups) return;
+    drawIncidentLayers(groups, incident);
+    applyLayerVisibility(map, groups, visibleRef.current);
     fitRegion(map, incident);
     map.invalidateSize();
   }, [incident]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    const groups = groupsRef.current;
+    if (!map || !groups) return;
+    applyLayerVisibility(map, groups, visible);
+  }, [visible]);
+
+  function onToggle(layer: MapLayerKey) {
+    setVisible((prev) => ({ ...prev, [layer]: !prev[layer] }));
+  }
+
   return (
     <div className="relative h-full min-h-[320px] w-full">
       <div ref={ref} className="absolute inset-0 z-0" />
-      <div className="pointer-events-none absolute bottom-16 left-3 z-[500] space-y-2">
-        <div className="rounded-md border border-[#1E2A40] bg-[#121A2B]/90 px-3 py-2 text-[11px] backdrop-blur">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-[#8B9BB8]">
-            Legend
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#FF4D2E]" /> Hotspot
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="h-0.5 w-4"
-              style={{
-                backgroundColor: incident.wind.some((w) =>
-                  isLiveWeatherNextWind(w),
-                )
-                  ? "#3DB9FF"
-                  : "#8B9BB8",
-              }}
-            />{" "}
-            Wind overlay
-          </div>
-          {incident.region.id === "cascade" && (
-            <div className="flex items-center gap-2">
-              <span className="h-0.5 w-4 bg-[#3DDC97]" /> Corridor
-            </div>
-          )}
-        </div>
-        <MapLegendStack firmsDemoFixture={isFirmsDemoFixture(incident)} />
+      <div className="pointer-events-none absolute bottom-16 left-3 z-[500]">
+        <MapLegendStack
+          incident={incident}
+          visible={visible}
+          onToggle={onToggle}
+        />
       </div>
       {incident.region.placeholder && (
         <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-[#FFB020]/40 bg-[#121A2B]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#FFB020]">
