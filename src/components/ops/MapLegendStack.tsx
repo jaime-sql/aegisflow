@@ -47,6 +47,7 @@ function LayerSwatch({
 /**
  * Compact map legend: Hotspots / Wind / Agents toggles with live counts,
  * then one honest feed-age line. Extra feed toggles stay out of the stack.
+ * Incident dossier / judge-path chrome are follow-ups — do not add them here.
  */
 export function MapLegendStack({
   incident,

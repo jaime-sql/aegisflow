@@ -258,6 +258,18 @@ function rolesUnchanged() {
   assert.doesNotMatch(rail, /MapLegendStack/);
   assert.doesNotMatch(rail, /onToggle/);
   assert.doesNotMatch(rail, /Hotspots/);
+  for (const file of [
+    "RightRail",
+    "TopBar",
+    "OpsShell",
+    "ExecSummaryCard",
+    "DispatchList",
+    "FeedBanner",
+  ] as const) {
+    const src = readFileSync(`src/components/ops/${file}.tsx`, "utf8");
+    assert.doesNotMatch(src, /dossier/i);
+    assert.doesNotMatch(src, /judge-path|judge path/i);
+  }
 }
 
 function uiWiring() {
