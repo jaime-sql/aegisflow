@@ -140,14 +140,21 @@ export async function resolveTtsKv(
   return processMemoryKv;
 }
 
-async function synthesizeElevenLabs(args: {
+/**
+ * Shared ElevenLabs TTS POST (Brief aloud and Ask Ops Speak answer).
+ * `logTag` defaults to brief-aloud so existing logs stay the same.
+ * Not a conversational agent — one text-to-speech clip only.
+ */
+export async function synthesizeElevenLabs(args: {
   text: string;
   voiceId: string;
   modelId: string;
   apiKey: string;
   fetchFn: typeof fetch;
+  logTag?: string;
 }): Promise<Uint8Array | null> {
   const url = `${ELEVENLABS_TTS_URL}/${encodeURIComponent(args.voiceId)}`;
+  const logTag = args.logTag ?? "brief-aloud";
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ELEVENLABS_TIMEOUT_MS);
   try {
@@ -165,7 +172,7 @@ async function synthesizeElevenLabs(args: {
       signal: ac.signal,
     });
     if (!res.ok) {
-      console.warn("[brief-aloud] elevenlabs HTTP", res.status);
+      console.warn(`[${logTag}] elevenlabs HTTP`, res.status);
       return null;
     }
     const buf = new Uint8Array(await res.arrayBuffer());
@@ -173,7 +180,7 @@ async function synthesizeElevenLabs(args: {
     return buf;
   } catch (err) {
     const message = err instanceof Error ? err.message : "elevenlabs failed";
-    console.warn("[brief-aloud] elevenlabs", message);
+    console.warn(`[${logTag}] elevenlabs`, message);
     return null;
   } finally {
     clearTimeout(timer);

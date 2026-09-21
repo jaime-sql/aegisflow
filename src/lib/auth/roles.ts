@@ -15,3 +15,11 @@ export function canDispatch(role: OpsRole): boolean {
 export function canSpeakBrief(role: OpsRole): boolean {
   return role === "manager" || role === "viewer";
 }
+
+/**
+ * Ask Ops and Speak answer are open to signed-in Ops (Manager and Viewer).
+ * Dispatch Ack/Assign stays `canDispatch` / Manager-only.
+ */
+export function canAskOps(role: OpsRole): boolean {
+  return role === "manager" || role === "viewer";
+}

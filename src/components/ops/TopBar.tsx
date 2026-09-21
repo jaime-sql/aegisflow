@@ -28,12 +28,14 @@ export function TopBar({
   session,
   regionPicker,
   onReplayTour,
+  onOpenAsk,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
   regionPicker: ReactNode;
   /** Clears the walkthrough seen flag and remounts the same five steps. */
   onReplayTour: () => void;
+  onOpenAsk: () => void;
 }) {
   const regionId = resolveRegionId(incident.region.id);
 
@@ -49,7 +51,7 @@ export function TopBar({
       <div className="hidden h-6 w-px bg-[#1E2A40] sm:block" />
 
       <div className="flex min-w-0 items-center gap-1.5">
-        <div data-ops-tour="region" className="min-w-0">
+        <div data-ops-tour="region" className="min-w-0 max-w-[42vw] sm:max-w-[260px]">
           {regionPicker}
         </div>
         <button
@@ -60,6 +62,14 @@ export function TopBar({
           className="shrink-0 cursor-pointer rounded border border-[#1E2A40] bg-[#121A2B] px-2 py-1 font-mono text-[10px] tracking-wider text-[#E8EEF9] hover:border-[#3DB9FF]/50 hover:text-[#3DB9FF]"
         >
           {OPS_WALKTHROUGH_CHROME.replay}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenAsk}
+          aria-haspopup="dialog"
+          className="shrink-0 rounded border border-[#3DB9FF]/45 bg-[#121A2B] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#3DB9FF] hover:bg-[#3DB9FF]/10"
+        >
+          Ask
         </button>
       </div>
 

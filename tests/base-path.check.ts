@@ -4,6 +4,8 @@ import {
   absoluteAppUrl,
   clerkPublicUrls,
   inferBasePathFromPathname,
+  opsAskSpeakUrl,
+  opsAskUrl,
   opsBriefAloudUrl,
   opsIncidentUrl,
   opsRegionHref,
@@ -85,6 +87,14 @@ assert.equal(
 assert.equal(
   opsBriefAloudUrl("evt_aegisfire01_incident", "cascade", "http://localhost:3000/ops"),
   "http://localhost:3000/api/ops/brief-aloud?eventId=evt_aegisfire01_incident&region=cascade",
+);
+assert.equal(
+  opsAskUrl(workerOps),
+  "https://aegisflow.jaime-8a8.workers.dev/aegisflow/api/ops/ask",
+);
+assert.equal(
+  opsAskSpeakUrl("http://localhost:3000/ops"),
+  "http://localhost:3000/api/ops/ask-speak",
 );
 
 assert.equal(opsRegionHref("cascade", workerOps), "/aegisflow/ops?region=cascade");

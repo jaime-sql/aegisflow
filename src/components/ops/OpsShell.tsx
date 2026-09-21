@@ -13,6 +13,7 @@ import { RightRail } from "./RightRail";
 import { LineageDrawer } from "./LineageDrawer";
 import { FeedBanner } from "./FeedBanner";
 import { OpsWalkthrough } from "./OpsWalkthrough";
+import { AskOpsDrawer } from "./AskOpsDrawer";
 
 const OpsMap = dynamic(() => import("./OpsMap").then((m) => m.OpsMap), {
   ssr: false,
@@ -35,6 +36,7 @@ export function OpsShell({
   ttsConfigured: boolean;
 }) {
   const [lineageId, setLineageId] = useState<string | null>(null);
+  const [askOpen, setAskOpen] = useState(false);
   const [walkthroughKey, setWalkthroughKey] = useState(0);
   const replayOpsWalkthrough = useCallback(() => {
     // Stay on the current URL (including /aegisflow). No fetch, no navigation.
@@ -62,6 +64,7 @@ export function OpsShell({
         session={session}
         regionPicker={regionPicker}
         onReplayTour={replayOpsWalkthrough}
+        onOpenAsk={() => setAskOpen(true)}
       />
       <div className="relative grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65%)_minmax(340px,35%)]">
         <main className="relative min-h-[45vh]">
@@ -87,6 +90,12 @@ export function OpsShell({
             onClose={() => setLineageId(null)}
           />
         )}
+        <AskOpsDrawer
+          open={askOpen}
+          incident={incident}
+          configured={ttsConfigured}
+          onClose={() => setAskOpen(false)}
+        />
       </div>
       <OpsWalkthrough key={walkthroughKey} role={session.role} />
     </div>

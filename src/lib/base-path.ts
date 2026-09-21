@@ -96,6 +96,16 @@ export function opsIncidentUrl(regionId: string, currentHref?: string): string {
   );
 }
 
+/** POST `/api/ops/ask` under the active basePath. */
+export function opsAskUrl(currentHref?: string): string {
+  return absoluteAppUrl("/api/ops/ask", currentHref);
+}
+
+/** POST `/api/ops/ask-speak` under the active basePath (latest Ask reply only). */
+export function opsAskSpeakUrl(currentHref?: string): string {
+  return absoluteAppUrl("/api/ops/ask-speak", currentHref);
+}
+
 /** GET `/api/ops/brief-aloud` under the active basePath (listen-only TTS). */
 export function opsBriefAloudUrl(
   eventId: string,
