@@ -164,7 +164,9 @@ function uiWiring() {
   const replayAt = top.indexOf('data-ops-tour-replay="true"');
   const feedsAt = top.indexOf('className="ml-auto');
   assert.ok(regionAt >= 0 && replayAt > regionAt && feedsAt > replayAt);
-  const replaySlice = top.slice(replayAt, feedsAt);
+  const buttonAt = top.lastIndexOf("<button", replayAt);
+  assert.ok(buttonAt > regionAt);
+  const replaySlice = top.slice(buttonAt, feedsAt);
   assert.match(replaySlice, /type="button"/);
   assert.match(replaySlice, /onClick=\{onReplayTour\}/);
   assert.doesNotMatch(replaySlice, /session\.role/);
