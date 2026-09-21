@@ -2,8 +2,8 @@
 /**
  * cloudflare/wrangler-action getSecret() throws if any name in `secrets:` is
  * empty. Cloudflare Prod must still deploy when optional LLM / Modal /
- * ElevenLabs (and ingest) keys are unset — adapters already fixture-fallback
- * and Brief aloud shows muted SIM.
+ * ElevenLabs (and ingest) keys are unset — adapters already fixture-fallback,
+ * Brief aloud / Speak answer show muted SIM, and Ask Ops stays on FAQ.
  *
  * Prints skipped/uploaded names to stderr (never values). Writes a multiline
  * GitHub Actions output `list` of non-empty secret names.
@@ -86,7 +86,7 @@ function main() {
   if (result.skipped.length) {
     console.error(`Skipping empty optional Worker secrets: ${result.skipped.join(", ")}`);
     console.error(
-      "::notice::Agent / ElevenLabs / ingest keys are optional. Empty values are not uploaded (wrangler-action would fail). Missing OpenAI leaves AgentChip on SIM; missing ElevenLabs leaves Brief aloud on muted SIM.",
+      "::notice::Agent / ElevenLabs / ingest keys are optional. Empty values are not uploaded (wrangler-action would fail). Missing OpenAI leaves AgentChip on SIM and Ask Ops on FAQ; missing ElevenLabs leaves Brief aloud and Speak answer on muted SIM.",
     );
   }
   console.error(`Uploading Worker secrets: ${result.present.join(", ")}`);
