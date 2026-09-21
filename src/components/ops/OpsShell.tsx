@@ -11,6 +11,7 @@ import { TopBar } from "./TopBar";
 import { RightRail } from "./RightRail";
 import { LineageDrawer } from "./LineageDrawer";
 import { FeedBanner } from "./FeedBanner";
+import { OpsWalkthrough } from "./OpsWalkthrough";
 
 const OpsMap = dynamic(() => import("./OpsMap").then((m) => m.OpsMap), {
   ssr: false,
@@ -75,6 +76,7 @@ export function OpsShell({
           />
         )}
       </div>
+      <OpsWalkthrough role={session.role} />
     </div>
   );
 }

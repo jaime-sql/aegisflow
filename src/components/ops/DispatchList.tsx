@@ -28,7 +28,7 @@ export function DispatchList({
   const [state, setState] = useState<Record<string, ItemState>>({});
 
   return (
-    <section className="border-b border-[#1E2A40] px-4 py-3">
+    <section data-ops-tour="dispatch" className="border-b border-[#1E2A40] px-4 py-3">
       <h2 className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#8B9BB8]">
         Dispatch
       </h2>

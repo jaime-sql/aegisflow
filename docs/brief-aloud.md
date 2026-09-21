@@ -1,21 +1,21 @@
 # Brief aloud (ElevenLabs TTS)
 
-Manager-only **Brief aloud** on the Ops **exec summary**. Short radio-style clip (~15–30s), played in Ops. Not a podcast. Not on the agent recommendation chip (v1).
+**Brief aloud** on the Ops **exec summary** is listen-only play/stop for **Manager and Viewer**. Short radio-style clip (~15–30s), played in Ops. Not a podcast. Not on the agent recommendation chip (v1). Dispatch **Ack / Assign stays Manager-only**.
 
 WIND LIVE fill and deeper agent-key work stay parked.
 
 ## Acceptance (Design + QA)
 
-Both bars are PR acceptance. Design wins on Viewer chrome: the control is **hidden**, not locked-grey.
+Both bars are PR acceptance. Jaime + BA 2026-09-21: Viewer can hear the brief.
 
 | Bar | Rule |
 | --- | --- |
 | Design | One primary control on **Exec Summary only**. Label **Brief aloud**. No agent-rec control in v1. |
-| Design | **Manager only.** Viewer never sees or can trigger it (hidden, not greyed half-working). |
+| Design | **Listen-only** play/stop for Manager **and** Viewer. Dispatch Ack/Assign stays Manager-only. |
 | Design | Fail → muted/**SIM** on the control. Ops map/rail never break. |
 | Design | Playing state: **Speaking…**. Click again to stop. |
-| QA | Manager Brief aloud plays a **short** clip without blanking Ops. |
-| QA | Viewer never sees the control. Stays out of the Viewer rail. |
+| QA | Manager and Viewer Brief aloud plays a **short** clip without blanking Ops. |
+| QA | Viewer can play/stop. Viewer cannot Ack/Assign. |
 | QA | Same `eventId` replay hits cache (no second ElevenLabs burn). |
 | QA | Missing key / API fail → quiet SIM or muted control. No crash, no toast spam. |
 | QA | Control only on Exec Summary. Shows **Speaking…** while playing. |
@@ -24,7 +24,7 @@ Both bars are PR acceptance. Design wins on Viewer chrome: the control is **hidd
 
 | Rule | Behavior |
 | --- | --- |
-| Who | **Manager only.** Viewer never sees the control and cannot trigger the API (403). Hidden, not greyed half-working. |
+| Who | **Manager and Viewer.** Listen-only play/stop. `canSpeakBrief` is true for both. Ack/Assign stays Manager-only. |
 | Where | One primary control on Exec Summary. Label **Brief aloud**. |
 | Fail | Missing `ELEVENLABS_API_KEY` or ElevenLabs error → quiet **SIM** / muted control. Ops map/rail never crash. |
 | Play | **Speaking…** while the clip runs. Click again to stop. |
@@ -51,8 +51,7 @@ CI unsets `ELEVENLABS_API_KEY`. Tests mock `fetch`. `npm test` must pass without
 `GET` / `POST` `{basePath}/api/ops/brief-aloud?eventId=&region=`
 
 - Clerk-protected like the rest of Ops (signed-in).
-- Manager → `audio/mpeg`, or JSON `{ ok: false, sim: true, reason }` when the key is missing / upstream fails.
-- Viewer → `403 { error: "manager_only" }` (no TTS call).
+- Manager **and** Viewer → `audio/mpeg`, or JSON `{ ok: false, sim: true, reason }` when the key is missing / upstream fails.
 - Script is built server-side from the region exec summary. Clients cannot POST arbitrary text.
 
 Header `X-AegisFlow-Tts`: `live` | `cache` | `sim`.
@@ -68,4 +67,4 @@ Local `next dev` uses an in-process map when KV is unbound.
 1. GitHub Actions secret `ELEVENLABS_API_KEY` is already on [jaime-sql/aegisflow](https://github.com/jaime-sql/aegisflow). Cloudflare Prod uploads it as Worker secret `ELEVENLABS_API_KEY` on `aegisflow` **when the Actions secret is non-empty**. Empty OpenAI / DeepSeek / Modal keys must not block that upload — they are skipped. If ElevenLabs is empty, Brief aloud stays muted **SIM** and deploy still succeeds.
 2. No preferred voice. Default is **Rachel** `21m00Tcm4TlvDq8ikWAM`. Optional override: Actions secret `ELEVENLABS_VOICE_ID` (also uploaded as a Worker secret) or Wrangler / `.env.local`. Browse ids in the [ElevenLabs Voices](https://elevenlabs.io/app/voice-library) dashboard.
 3. Re-run **Actions → Cloudflare Prod** so the Worker secrets land.
-4. Sign in as Manager on `/aegisflow/ops`. Exec summary shows **Brief aloud**. Viewer (`publicMetadata.role=viewer` or `/ops?role=viewer` in DEV bypass) must not show it.
+4. Sign in as Manager **or** Viewer on `/aegisflow/ops`. Exec summary shows **Brief aloud** (play/stop). Viewer (`publicMetadata.role=viewer` or `/ops?role=viewer` in DEV bypass) can hear the brief; Ack/Assign stays locked.

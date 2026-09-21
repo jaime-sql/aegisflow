@@ -13,7 +13,7 @@ Emergency managers drown in siloed feeds (satellite, weather, drones, cams, citi
 
 | Layer | Stage 1 |
 | --- | --- |
-| Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. **Brief aloud** is Manager-only (hidden for Viewer). |
+| Auth | **Clerk** — Emergency Manager vs Viewer. Viewer **sees** dispatch actions locked, not hidden. **Brief aloud** is listen-only play/stop for Manager and Viewer. |
 | Ingest | NASA **FIRMS** hotspots (live or fixture) + **WeatherNext** 10 m wind (BigQuery, Experimental; fixture fallback). One feed can fail without blanking Ops. |
 | Agents | Fire propagation · Evacuation logistics · Resource allocation. **OpenAI** primary / **DeepSeek** backup, hosted on **Modal** when `MODAL_ENDPOINT` is set. Stub fallback marks the existing AgentChip **SIM** (same token as RF / Edge). Live runs only refresh chip confidence + lineage drawer. |
 | Runtime | Modal worker (`workers/modal_stub.py`) — `python3 workers/modal_stub.py` locally; `modal deploy` for live HTTP. |
@@ -53,7 +53,8 @@ Without API keys, Ops loads the **AegisFire-01** fixture remapped into the **El 
 | Check | URL |
 | --- | --- |
 | Ops dashboard | http://localhost:3000/ops |
-| Viewer (bypass) | http://localhost:3000/ops?role=viewer — no Brief aloud control |
+| Viewer (bypass) | http://localhost:3000/ops?role=viewer — Brief aloud play/stop; Ack/Assign locked |
+| First-visit tour | Coach marks on `/ops` (5 Design steps for Manager and Viewer; Skip / Don’t show again) |
 | Clerk sign-in | http://localhost:3000/sign-in |
 | Fabric twin (same IDs, no map) | http://localhost:3000/fabric |
 | Incident JSON | http://localhost:3000/api/ops/incident (default El Salvador / WUI) |
@@ -114,7 +115,7 @@ See [`.env.example`](.env.example). Secrets are gitignored.
 | `WIND_CACHE` (KV) | Cloudflare KV binding for WeatherNext ticks (`wind:el-salvador`, `wind:cascade`). Cron `*/8 * * * *` refreshes both picker regions with a 90s BigQuery budget. Ops reads cache only. Signed-in `GET /aegisflow/api/ops/wind-cache-refresh` is a one-shot fill. |
 | `OPENAI_API_KEY` / `DEEPSEEK_*` | LLM router. **Optional for Cloudflare Prod** — empty/missing GitHub secrets are skipped (wrangler-action fails if they are listed empty). Empty → fixture agents (**SIM**). Live: OpenAI primary, DeepSeek backup. See [`docs/agents.md`](docs/agents.md). |
 | `MODAL_ENDPOINT` / `MODAL_TOKEN_*` | Preferred agent host. **Optional for Prod** (same skip-if-empty rule). Empty → local LLM or fixture. Proxy-auth headers sent when tokens are set. |
-| `ELEVENLABS_API_KEY` | Manager **Brief aloud** (exec summary TTS). **Optional for Prod.** When the Actions secret is set, Cloudflare Prod uploads it as a Worker secret; when empty, it is skipped and Brief aloud shows muted **SIM**. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
+| `ELEVENLABS_API_KEY` | Manager + Viewer **Brief aloud** (exec summary TTS, listen-only). **Optional for Prod.** When the Actions secret is set, Cloudflare Prod uploads it as a Worker secret; when empty, it is skipped and Brief aloud shows muted **SIM**. See [`docs/brief-aloud.md`](docs/brief-aloud.md). |
 | `ELEVENLABS_VOICE_ID` | Optional Worker secret (skip-if-empty). Default premade Rachel `21m00Tcm4TlvDq8ikWAM` comes from `wrangler.jsonc` when the secret is unset (Jaime did not pick a voice). Override via Actions secret / Wrangler / `.env.local`. |
 | `AEGISFLOW_LIVE_LLM` | Set `false` to force fixture even if keys exist. |
 
@@ -170,7 +171,7 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
      - `DEEPSEEK_API_KEY` — cheaper backup LLM. Wrangler secret when set; skip when empty.
      - `MODAL_ENDPOINT` — `*.modal.run` URL from `modal deploy workers/modal_stub.py`. Wrangler secret/var when set.
      - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal proxy token. Wrangler secrets when set.
-   - Optional **Brief aloud** (Manager exec-summary TTS; empty → muted SIM). **Not required to deploy.** When `ELEVENLABS_API_KEY` is set, Cloudflare Prod uploads it; when empty, Brief aloud stays SIM. See [`docs/brief-aloud.md`](docs/brief-aloud.md):
+   - Optional **Brief aloud** (exec-summary TTS for Manager and Viewer; empty → muted SIM). **Not required to deploy.** When `ELEVENLABS_API_KEY` is set, Cloudflare Prod uploads it; when empty, Brief aloud stays SIM. See [`docs/brief-aloud.md`](docs/brief-aloud.md):
      - `ELEVENLABS_API_KEY` — Worker secret when set. Expire-first credits; last clip cached per `eventId` in `WIND_CACHE` (`tts:` keys).
      - `ELEVENLABS_VOICE_ID` — optional Worker secret when set. Default Rachel `21m00Tcm4TlvDq8ikWAM` from `wrangler.jsonc` if unset.
    - If the linked BigQuery dataset is not named `weathernext`, set Wrangler var `WEATHERNEXT_BQ_DATASET`. See [`docs/weathernext.md`](docs/weathernext.md).
@@ -183,7 +184,7 @@ Agents often **cannot** add GitHub Actions secrets (`actions:write` is missing).
    - Sign-in / sign-up stay under `/aegisflow/...` and return 200 with the Clerk widget (Dev keys show Clerk’s development banner).
    - UserButton **Sign out** → `/aegisflow/sign-in` (must **not** hang on a spinner or navigate to apex `cortexmatter.com/`).
    - Map tiles + `/aegisflow/_next/...` + `/aegisflow/leaflet/...` load.
-   - Viewer vs Manager still works (Clerk `publicMetadata.role`). Viewer must **not** see Brief aloud; Manager sees it on the exec summary (muted **SIM** if `ELEVENLABS_API_KEY` is empty).
+   - Viewer vs Manager still works (Clerk `publicMetadata.role`). Viewer **sees Brief aloud** (listen-only play/stop) and locked dispatch; Manager sees Brief aloud plus Ack/Assign (muted **SIM** if `ELEVENLABS_API_KEY` is empty). First-visit Ops coach marks run five Design steps for both roles (Skip / Don’t show again).
    - Fabric twin: `https://cortexmatter.com/aegisflow/fabric`.
    - Direct Worker: `https://aegisflow.jaime-8a8.workers.dev/aegisflow` should behave the same (add this host under Clerk allowed origins).
 

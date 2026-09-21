@@ -8,7 +8,10 @@ export function canDispatch(role: OpsRole): boolean {
   return role === "manager";
 }
 
-/** Manager-only ElevenLabs Brief aloud. Viewer never sees or triggers TTS. */
+/**
+ * Brief aloud play/stop is open to signed-in Ops (Manager and Viewer).
+ * Listen-only — dispatch Ack/Assign stays `canDispatch` / Manager-only.
+ */
 export function canSpeakBrief(role: OpsRole): boolean {
-  return role === "manager";
+  return role === "manager" || role === "viewer";
 }

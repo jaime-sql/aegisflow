@@ -126,6 +126,7 @@ export function BriefAloudButton({
   return (
     <button
       type="button"
+      data-ops-tour="brief-aloud"
       onClick={onBrief}
       disabled={muted}
       aria-label={
