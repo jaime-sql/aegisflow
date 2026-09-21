@@ -9,6 +9,8 @@ export const OPS_WALKTHROUGH_CHROME = {
   dontShowAgain: "Don't show again",
   next: "Next",
   done: "Done",
+  /** TopBar replay control. Same five steps; not a sixth coach mark. */
+  replay: "Tour",
 } as const;
 
 export const OPS_WALKTHROUGH_TARGETS = [
@@ -97,6 +99,7 @@ export function opsWalkthroughSteps(role: OpsRole): OpsWalkthroughStep[] {
 export type WalkthroughStore = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 };
 
 function browserStore(): WalkthroughStore | null {
@@ -130,6 +133,22 @@ export function dismissOpsWalkthrough(store?: WalkthroughStore | null): void {
   if (!s) return;
   try {
     s.setItem(OPS_WALKTHROUGH_STORAGE_KEY, OPS_WALKTHROUGH_STORAGE_VALUE);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Drop the seen flag so the same overlay can open again.
+ * Throws never — a blocked store stays treated as dismissed.
+ */
+export function clearOpsWalkthroughDismissal(
+  store?: WalkthroughStore | null,
+): void {
+  const s = store === undefined ? browserStore() : store;
+  if (!s) return;
+  try {
+    s.removeItem(OPS_WALKTHROUGH_STORAGE_KEY);
   } catch {
     // ignore
   }

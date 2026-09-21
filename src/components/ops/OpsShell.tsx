@@ -1,12 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { IncidentEvent } from "@/lib/schema";
 import type { OpsSession } from "@/lib/auth/session";
 import { isFeedUnhealthy } from "@/lib/ui/status";
 import { withBasePath } from "@/lib/base-path";
+import { clearOpsWalkthroughDismissal } from "@/lib/ui/ops-walkthrough";
 import { TopBar } from "./TopBar";
 import { RightRail } from "./RightRail";
 import { LineageDrawer } from "./LineageDrawer";
@@ -34,6 +35,12 @@ export function OpsShell({
   ttsConfigured: boolean;
 }) {
   const [lineageId, setLineageId] = useState<string | null>(null);
+  const [walkthroughKey, setWalkthroughKey] = useState(0);
+  const replayOpsWalkthrough = useCallback(() => {
+    // Stay on the current URL (including /aegisflow). No fetch, no navigation.
+    clearOpsWalkthroughDismissal();
+    setWalkthroughKey((key) => key + 1);
+  }, []);
   const selected = useMemo(
     () => incident.agents.find((a) => a.eventId === lineageId) ?? null,
     [incident.agents, lineageId],
@@ -50,7 +57,12 @@ export function OpsShell({
           </span>
         </div>
       )}
-      <TopBar incident={incident} session={session} regionPicker={regionPicker} />
+      <TopBar
+        incident={incident}
+        session={session}
+        regionPicker={regionPicker}
+        onReplayTour={replayOpsWalkthrough}
+      />
       <div className="relative grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65%)_minmax(340px,35%)]">
         <main className="relative min-h-[45vh]">
           <OpsMap incident={incident} />
@@ -76,7 +88,7 @@ export function OpsShell({
           />
         )}
       </div>
-      <OpsWalkthrough role={session.role} />
+      <OpsWalkthrough key={walkthroughKey} role={session.role} />
     </div>
   );
 }

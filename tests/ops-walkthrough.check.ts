@@ -8,6 +8,7 @@ import {
   OPS_WALKTHROUGH_STORAGE_KEY,
   OPS_WALKTHROUGH_STORAGE_VALUE,
   OPS_WALKTHROUGH_TARGETS,
+  clearOpsWalkthroughDismissal,
   dismissOpsWalkthrough,
   isOpsWalkthroughDismissed,
   opsTourSelector,
@@ -24,6 +25,9 @@ function memoryStore(init?: Record<string, string>): WalkthroughStore & {
     getItem: (key) => data.get(key) ?? null,
     setItem: (key, value) => {
       data.set(key, value);
+    },
+    removeItem: (key) => {
+      data.delete(key);
     },
   };
 }
@@ -52,6 +56,7 @@ function copyIsDesignVerbatim() {
   );
   assert.equal(OPS_WALKTHROUGH_CHROME.skip, "Skip");
   assert.equal(OPS_WALKTHROUGH_CHROME.dontShowAgain, "Don't show again");
+  assert.equal(OPS_WALKTHROUGH_CHROME.replay, "Tour");
 }
 
 function fiveStepsBothRoles() {
@@ -115,9 +120,22 @@ function storageOncePerBrowser() {
     setItem: () => {
       throw new Error("blocked");
     },
+    removeItem: () => {
+      throw new Error("blocked");
+    },
   };
   assert.equal(isOpsWalkthroughDismissed(exploding), true);
   assert.doesNotThrow(() => dismissOpsWalkthrough(exploding));
+
+  clearOpsWalkthroughDismissal(already);
+  assert.equal(isOpsWalkthroughDismissed(already), false);
+  assert.equal(already.data.has(OPS_WALKTHROUGH_STORAGE_KEY), false);
+  dismissOpsWalkthrough(already);
+  assert.equal(isOpsWalkthroughDismissed(already), true);
+
+  assert.doesNotThrow(() => clearOpsWalkthroughDismissal(null));
+  assert.doesNotThrow(() => clearOpsWalkthroughDismissal(exploding));
+  assert.equal(isOpsWalkthroughDismissed(exploding), true);
 }
 
 function uiWiring() {
@@ -133,15 +151,31 @@ function uiWiring() {
   const shell = readFileSync("src/components/ops/OpsShell.tsx", "utf8");
   assert.match(shell, /OpsWalkthrough/);
   assert.match(shell, /role=\{session\.role\}/);
+  assert.match(shell, /clearOpsWalkthroughDismissal\(\)/);
+  assert.match(shell, /onReplayTour=\{replayOpsWalkthrough\}/);
+  assert.match(shell, /<OpsWalkthrough key=\{walkthroughKey\} role=\{session\.role\} \/>/);
+  assert.doesNotMatch(shell, /fetch\(/);
+  assert.doesNotMatch(shell, /router\.(push|replace)/);
 
   const top = readFileSync("src/components/ops/TopBar.tsx", "utf8");
   assert.match(top, /data-ops-tour="region"/);
+  assert.match(top, /OPS_WALKTHROUGH_CHROME\.replay/);
+  const regionAt = top.indexOf('data-ops-tour="region"');
+  const replayAt = top.indexOf('data-ops-tour-replay="true"');
+  const feedsAt = top.indexOf('className="ml-auto');
+  assert.ok(regionAt >= 0 && replayAt > regionAt && feedsAt > replayAt);
+  const replaySlice = top.slice(replayAt, feedsAt);
+  assert.match(replaySlice, /type="button"/);
+  assert.match(replaySlice, /onClick=\{onReplayTour\}/);
+  assert.doesNotMatch(replaySlice, /session\.role/);
+  assert.doesNotMatch(replaySlice, /href=|fetch\(|withBasePath|\/ops|disabled=/);
 
   const legend = readFileSync("src/components/ops/MapLegendStack.tsx", "utf8");
   assert.match(legend, /data-ops-tour="map-layers"/);
 
   const rail = readFileSync("src/components/ops/RightRail.tsx", "utf8");
   assert.match(rail, /data-ops-tour="agents-lineage"/);
+  assert.doesNotMatch(rail, /data-ops-tour-replay|onReplayTour/);
 
   const dispatch = readFileSync("src/components/ops/DispatchList.tsx", "utf8");
   assert.match(dispatch, /data-ops-tour="dispatch"/);

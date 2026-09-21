@@ -12,6 +12,7 @@ import {
   windChipDisplay,
   windChipFeedStatus,
 } from "@/lib/ui/wind-feed";
+import { OPS_WALKTHROUGH_CHROME } from "@/lib/ui/ops-walkthrough";
 import { SimBadge } from "./SimBadge";
 import { FirmsVerifyButton } from "./FirmsVerifyButton";
 
@@ -26,10 +27,13 @@ export function TopBar({
   incident,
   session,
   regionPicker,
+  onReplayTour,
 }: {
   incident: IncidentEvent;
   session: OpsSession;
   regionPicker: ReactNode;
+  /** Clears the walkthrough seen flag and remounts the same five steps. */
+  onReplayTour: () => void;
 }) {
   const regionId = resolveRegionId(incident.region.id);
 
@@ -44,8 +48,19 @@ export function TopBar({
 
       <div className="hidden h-6 w-px bg-[#1E2A40] sm:block" />
 
-      <div data-ops-tour="region" className="min-w-0">
-        {regionPicker}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div data-ops-tour="region" className="min-w-0">
+          {regionPicker}
+        </div>
+        <button
+          type="button"
+          onClick={onReplayTour}
+          data-ops-tour-replay="true"
+          aria-label={OPS_WALKTHROUGH_CHROME.replay}
+          className="shrink-0 cursor-pointer rounded border border-[#1E2A40] bg-[#121A2B] px-2 py-1 font-mono text-[10px] tracking-wider text-[#E8EEF9] hover:border-[#3DB9FF]/50 hover:text-[#3DB9FF]"
+        >
+          {OPS_WALKTHROUGH_CHROME.replay}
+        </button>
       </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
