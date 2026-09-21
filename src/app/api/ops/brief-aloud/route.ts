@@ -4,9 +4,9 @@ import { handleBriefAloud } from "@/lib/tts/brief";
 export const dynamic = "force-dynamic";
 
 /**
- * Manager-only ElevenLabs Brief aloud.
+ * ElevenLabs Brief aloud (Manager + Viewer listen-only play/stop).
  * Returns audio/mpeg on success, JSON `{ sim: true }` on missing key / failure.
- * Viewer → 403. Never throws to the Ops shell.
+ * Never throws to the Ops shell.
  */
 async function handle(request: Request): Promise<Response> {
   try {

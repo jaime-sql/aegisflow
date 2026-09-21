@@ -96,7 +96,7 @@ export function opsIncidentUrl(regionId: string, currentHref?: string): string {
   );
 }
 
-/** GET `/api/ops/brief-aloud` under the active basePath (Manager-only TTS). */
+/** GET `/api/ops/brief-aloud` under the active basePath (listen-only TTS). */
 export function opsBriefAloudUrl(
   eventId: string,
   regionId: string,

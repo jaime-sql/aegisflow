@@ -44,7 +44,9 @@ export function TopBar({
 
       <div className="hidden h-6 w-px bg-[#1E2A40] sm:block" />
 
-      {regionPicker}
+      <div data-ops-tour="region" className="min-w-0">
+        {regionPicker}
+      </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <div className="hidden items-center gap-2 md:flex">

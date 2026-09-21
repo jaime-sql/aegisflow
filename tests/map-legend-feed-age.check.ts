@@ -246,7 +246,7 @@ function rolesUnchanged() {
   assert.equal(canDispatch("manager"), true);
   assert.equal(canDispatch("viewer"), false);
   assert.equal(canSpeakBrief("manager"), true);
-  assert.equal(canSpeakBrief("viewer"), false);
+  assert.equal(canSpeakBrief("viewer"), true);
 
   const dispatch = readFileSync("src/components/ops/DispatchList.tsx", "utf8");
   assert.match(dispatch, /canDispatch\(role\)/);

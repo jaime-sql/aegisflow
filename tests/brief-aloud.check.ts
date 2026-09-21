@@ -53,9 +53,9 @@ const viewer = { role: "viewer" as const };
 const sv = OPS_REGIONS["el-salvador"];
 
 assert.equal(canSpeakBrief("manager"), true);
-assert.equal(canSpeakBrief("viewer"), false);
+assert.equal(canSpeakBrief("viewer"), true);
 assert.equal(canDispatch("viewer"), false);
-assert.notEqual(canSpeakBrief("viewer"), true);
+assert.equal(canDispatch("manager"), true);
 
 assert.equal(isElevenLabsConfigured({}), false);
 assert.equal(isElevenLabsConfigured({ ELEVENLABS_API_KEY: "" }), false);
@@ -85,32 +85,65 @@ assert.ok(clipped.length < 500);
 assert.equal(briefTextHash("a"), briefTextHash("a"));
 assert.notEqual(briefTextHash("a"), briefTextHash("b"));
 
-async function viewerForbidden() {
-  const res = await handleBriefAloud({
-    session: viewer,
-    eventId: sv.incidentEventId,
-    regionId: sv.id,
-    env: { ELEVENLABS_API_KEY: "sk_live_should_not_be_used" },
-    fetch: countingFetch().fetchFn,
-    kv: memoryTtsKv(),
-  });
-  assert.equal(res.status, 403);
-  const body = await jsonBody(res);
-  assert.equal(body.error, "manager_only");
-}
-
-async function viewerDoesNotCallElevenLabs() {
+async function viewerCanPlay() {
   const probe = countingFetch();
   const res = await handleBriefAloud({
     session: viewer,
     eventId: sv.incidentEventId,
     regionId: sv.id,
-    env: { ELEVENLABS_API_KEY: "sk_live_should_not_be_used" },
+    env: { ELEVENLABS_API_KEY: "sk_test_key" },
     fetch: probe.fetchFn,
     kv: memoryTtsKv(),
   });
-  assert.equal(res.status, 403);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "audio/mpeg");
+  assert.equal(res.headers.get("x-aegisflow-tts"), "live");
+  assert.equal(probe.calls, 1);
+}
+
+async function viewerMissingKeyIsSim() {
+  const probe = countingFetch();
+  const res = await handleBriefAloud({
+    session: viewer,
+    eventId: sv.incidentEventId,
+    regionId: sv.id,
+    env: { ELEVENLABS_API_KEY: "" },
+    fetch: probe.fetchFn,
+    kv: memoryTtsKv(),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("x-aegisflow-tts"), "sim");
+  const body = await jsonBody(res);
+  assert.equal(body.sim, true);
+  assert.equal(body.reason, "missing_key");
   assert.equal(probe.calls, 0);
+}
+
+async function viewerCacheHitSkipsElevenLabs() {
+  const probe = countingFetch();
+  const kv = memoryTtsKv();
+  const env = { ELEVENLABS_API_KEY: "sk_test_key" };
+  const first = await handleBriefAloud({
+    session: manager,
+    eventId: sv.incidentEventId,
+    regionId: sv.id,
+    env,
+    fetch: probe.fetchFn,
+    kv,
+  });
+  assert.equal(first.status, 200);
+  assert.equal(probe.calls, 1);
+  const second = await handleBriefAloud({
+    session: viewer,
+    eventId: sv.incidentEventId,
+    regionId: sv.id,
+    env,
+    fetch: probe.fetchFn,
+    kv,
+  });
+  assert.equal(second.status, 200);
+  assert.equal(second.headers.get("x-aegisflow-tts"), "cache");
+  assert.equal(probe.calls, 1, "Viewer replay must hit cache, not re-call ElevenLabs");
 }
 
 async function missingKeyIsSim() {
@@ -290,7 +323,7 @@ function uiWiring() {
     assert.doesNotMatch(
       src,
       /BriefAloudButton|Brief aloud/,
-      `${path} must stay out of Brief aloud (exec summary only; not Viewer rail)`,
+      `${path} must stay out of Brief aloud (exec summary only)`,
     );
   }
 
@@ -329,21 +362,25 @@ function uiWiring() {
   const docs = readFileSync("docs/brief-aloud.md", "utf8");
   assert.match(docs, /21m00Tcm4TlvDq8ikWAM/);
   assert.match(docs, /optional for Prod/i);
-  assert.match(docs, /Manager only/);
+  assert.match(docs, /listen-only/i);
   assert.match(docs, /tts:<eventId>/);
   assert.match(docs, /Acceptance \(Design \+ QA\)/);
-  assert.match(docs, /Viewer never sees/);
+  assert.match(docs, /Viewer/);
+  assert.doesNotMatch(docs, /Viewer never sees/);
+  assert.doesNotMatch(docs, /manager_only/);
   assert.match(docs, /Speaking…/);
   assert.match(docs, /no toast spam/);
   assert.match(docs, /Same `eventId` replay hits cache/);
+  assert.match(docs, /Ack\/Assign stays Manager-only/);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/brief-aloud\.check\.ts/);
 }
 
 async function main() {
-  await viewerForbidden();
-  await viewerDoesNotCallElevenLabs();
+  await viewerCanPlay();
+  await viewerMissingKeyIsSim();
+  await viewerCacheHitSkipsElevenLabs();
   await missingKeyIsSim();
   await cacheHitSkipsElevenLabs();
   await upstreamFailureIsSim();
@@ -351,7 +388,7 @@ async function main() {
   await networkErrorIsSim();
   await eventMismatchIsSim();
   uiWiring();
-  console.log("OK  brief aloud (manager gate, SIM, cache hit, exec-summary-only)");
+  console.log("OK  brief aloud (Manager+Viewer listen-only, SIM, cache hit, exec-summary-only)");
 }
 
 main().catch((err) => {

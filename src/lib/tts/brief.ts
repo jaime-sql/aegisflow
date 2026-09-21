@@ -181,18 +181,15 @@ async function synthesizeElevenLabs(args: {
 }
 
 /**
- * Manager-only Brief aloud. Missing key / upstream failure → SIM JSON.
- * Never throws to the Ops map/rail.
+ * Brief aloud for Manager and Viewer (listen-only play/stop).
+ * Missing key / upstream failure → SIM JSON. Never throws to the Ops map/rail.
  */
 export async function handleBriefAloud(
   deps: BriefAloudDeps,
 ): Promise<Response> {
   try {
     if (!canSpeakBrief(deps.session.role)) {
-      return Response.json(
-        { error: "manager_only" },
-        { status: 403, headers: { "Cache-Control": "no-store" } },
-      );
+      return simJson("handler");
     }
 
     const env = deps.env ?? process.env;
