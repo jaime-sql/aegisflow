@@ -21,7 +21,7 @@ export function buildAgentPrompts(
     "You are an AegisFlow wildfire operations agent.",
     ROLE[agentId],
     "Return a single JSON object with keys: summary (string), confidence (0-1), recommendations (array of {actionId, label, detail, priority, resourceHint?}).",
-    "priority must be P1, P2, or P3. actionId must be kebab-case.",
+    "priority must be P1, P2, or P3. actionId must be unique kebab-case within recommendations; do not repeat an actionId.",
     "Ground every claim in the supplied hotspot and wind eventIds. Never invent eventIds.",
     "If hotspot source is NASA_FIRMS_FIXTURE, say so — do not claim live FIRMS detections.",
     "WeatherNext wind is Experimental. Keep summary to 2–4 sentences.",

@@ -1,6 +1,7 @@
 import type { AgentOutput, FeedComponent, Hotspot, WindTick } from "@/lib/schema";
+import { claimUniqueActionId } from "./action-ids";
 import { runOneAgent } from "./compose";
-import { agentHost, envOf } from "./runtime";
+import { agentHost, envOf, outputHash } from "./runtime";
 import type { AgentRunInput, AgentRuntimeDeps } from "./types";
 
 export { runEvacuation } from "./evacuation";
@@ -14,6 +15,40 @@ export {
 } from "./runtime";
 export { agentEventId, incidentToken } from "./ids";
 export type { AgentRunInput, AgentRuntimeDeps } from "./types";
+
+/**
+ * One flattened Dispatch list. The first copy of an actionId is kept; any
+ * later copy (same agent or another agent) is suffixed with agent id,
+ * eventId, or index. outputHash is recomputed only when an id changes.
+ */
+export function withUniqueDispatchActionIds(agents: AgentOutput[]): AgentOutput[] {
+  const seen = new Set<string>();
+  return agents.map((agent) => {
+    let changed = false;
+    const recommendations = agent.recommendations.map((action, index) => {
+      const actionId = claimUniqueActionId(action.actionId, seen, [
+        agent.agentId,
+        agent.eventId,
+        String(index),
+      ]);
+      if (actionId !== action.actionId) changed = true;
+      return actionId === action.actionId ? action : { ...action, actionId };
+    });
+    if (!changed) return agent;
+    return {
+      ...agent,
+      recommendations,
+      outputHash: outputHash({
+        agentId: agent.agentId,
+        incidentId: agent.incidentId,
+        summary: agent.summary,
+        recommendations,
+        lineageEventIds: agent.lineage.map((line) => line.eventId),
+        used: agent.model.used,
+      }),
+    };
+  });
+}
 
 export async function runFirePropagationWithDeps(
   input: AgentRunInput,
@@ -56,7 +91,7 @@ export async function runAllAgents(
       runOneAgent("resource-allocation", input, deps),
     ]);
     const results = [propagation, evacuation, resources];
-    const agents = results.map((r) => r.output);
+    const agents = withUniqueDispatchActionIds(results.map((r) => r.output));
     const attempted = results.some((r) => r.liveAttempted);
     const liveOk = results.filter((r) => r.liveOk);
     const errors = results.map((r) => r.error).filter((e): e is string => Boolean(e));

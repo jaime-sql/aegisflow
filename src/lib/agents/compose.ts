@@ -3,6 +3,7 @@ import { AGENT_TITLES, agentEventId } from "./ids";
 import { fixtureBodyFor } from "./fixtures";
 import { buildLineage, compactEvidence } from "./lineage";
 import { buildAgentPrompts } from "./prompts";
+import { withUniqueActionIds } from "./action-ids";
 import {
   MODEL_ROUTER,
   agentHost,
@@ -26,7 +27,10 @@ function usedFromUnknown(value: unknown): "openai" | "deepseek" | undefined {
   return undefined;
 }
 
-function liveFromModalPayload(payload: unknown): {
+function liveFromModalPayload(
+  payload: unknown,
+  scope: { agentId?: string; eventId?: string } = {},
+): {
   summary: string;
   confidence: number;
   recommendations: AgentOutput["recommendations"];
@@ -42,7 +46,7 @@ function liveFromModalPayload(payload: unknown): {
       : rec.output && typeof rec.output === "object"
         ? (rec.output as Record<string, unknown>)
         : rec;
-  const parsed = parseAgentJson(JSON.stringify(inner));
+  const parsed = parseAgentJson(JSON.stringify(inner), scope);
   const used =
     usedFromUnknown(rec.used) ??
     usedFromUnknown((rec.model as { used?: unknown } | undefined)?.used);
@@ -63,6 +67,10 @@ function assemble(args: {
   const lineage = buildLineage(args.agentId, args.input);
   const eventId = agentEventId(args.input.incidentId, args.agentId);
   const confidence = fixtureConfidenceCap(args.confidence, Boolean(args.degraded));
+  const recommendations = withUniqueActionIds(args.recommendations, {
+    agentId: args.agentId,
+    eventId,
+  });
   return {
     eventId,
     schemaVersion: SCHEMA_VERSION,
@@ -74,12 +82,12 @@ function assemble(args: {
       agentId: args.agentId,
       incidentId: args.input.incidentId,
       summary: args.summary,
-      recommendations: args.recommendations,
+      recommendations,
       lineageEventIds: lineage.map((l) => l.eventId),
       used: args.used,
     }),
     summary: args.summary,
-    recommendations: args.recommendations,
+    recommendations,
     lineage,
     model: {
       primary: MODEL_ROUTER.primary,
@@ -163,7 +171,7 @@ export async function runOneAgent(
     );
     if (modal.ok) {
       try {
-        const live = liveFromModalPayload(modal.payload);
+        const live = liveFromModalPayload(modal.payload, { agentId, eventId });
         const used = live.used ?? "openai";
         return {
           liveAttempted: true,
@@ -208,7 +216,7 @@ export async function runOneAgent(
     );
     if (llm.text && (llm.used === "openai" || llm.used === "deepseek")) {
       try {
-        const live = parseAgentJson(llm.text);
+        const live = parseAgentJson(llm.text, { agentId, eventId });
         return {
           liveAttempted: true,
           liveOk: true,

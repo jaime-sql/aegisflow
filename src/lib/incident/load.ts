@@ -2,7 +2,7 @@ import { fetchFirmsHotspots } from "@/lib/ingest/firms";
 import type { FirmsFetchDeps } from "@/lib/ingest/firms";
 import { fetchWindTicks } from "@/lib/ingest/wind";
 import type { WindFetchDeps } from "@/lib/ingest/wind";
-import { runAllAgents } from "@/lib/agents";
+import { runAllAgents, withUniqueDispatchActionIds } from "@/lib/agents";
 import type { AgentRuntimeDeps } from "@/lib/agents";
 import { cloneFixtureIncident } from "@/lib/fixtures/aegisfire-01";
 import { resolveOpsRegion } from "@/lib/regions";
@@ -91,7 +91,7 @@ export async function loadOpsIncident(
     executiveSummary: region.executiveSummary,
     hotspots: firms.hotspots,
     wind: wind.wind,
-    agents: agents.agents.length ? agents.agents : base.agents,
+    agents: withUniqueDispatchActionIds(agents.agents.length ? agents.agents : base.agents),
     feedHealth: rollup(base, [
       firms.health,
       wind.health,

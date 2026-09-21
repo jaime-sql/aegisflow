@@ -1,5 +1,6 @@
 import type { AgentOutput, DispatchAction } from "@/lib/schema";
 import { loadFixtureIncident } from "@/lib/fixtures/aegisfire-01";
+import { withUniqueActionIds } from "./action-ids";
 import type { AgentId, AgentRunInput } from "./types";
 
 const CASCADE_INCIDENT = "AegisFire-01";
@@ -79,14 +80,22 @@ const SV_WUI_BODIES: Record<AgentId, FixtureBody> = {
 };
 
 export function fixtureBodyFor(agentId: AgentId, input: AgentRunInput): FixtureBody {
-  if (input.incidentId === CASCADE_INCIDENT) {
-    const fixture = loadFixtureIncident().agents.find((a) => a.agentId === agentId);
-    if (!fixture) throw new Error(`Missing ${agentId} fixture`);
-    return {
-      summary: fixture.summary,
-      confidence: fixture.confidence,
-      recommendations: fixture.recommendations as DispatchAction[],
-    };
-  }
-  return SV_WUI_BODIES[agentId];
+  const body =
+    input.incidentId === CASCADE_INCIDENT
+      ? cascadeFixtureBody(agentId)
+      : SV_WUI_BODIES[agentId];
+  return {
+    ...body,
+    recommendations: withUniqueActionIds(body.recommendations, { agentId }),
+  };
+}
+
+function cascadeFixtureBody(agentId: AgentId): FixtureBody {
+  const fixture = loadFixtureIncident().agents.find((a) => a.agentId === agentId);
+  if (!fixture) throw new Error(`Missing ${agentId} fixture`);
+  return {
+    summary: fixture.summary,
+    confidence: fixture.confidence,
+    recommendations: fixture.recommendations as DispatchAction[],
+  };
 }

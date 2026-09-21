@@ -3,6 +3,11 @@
 import { useState } from "react";
 import type { DispatchAction } from "@/lib/schema";
 import { canDispatch, type OpsRole } from "@/lib/auth/roles";
+import { dispatchListKeys, type DispatchKeyInput } from "@/lib/ui/dispatch-keys";
+
+export type DispatchListItem = DispatchKeyInput & {
+  action: DispatchAction;
+};
 
 type ItemState = "open" | "acked" | "assigned";
 
@@ -18,14 +23,15 @@ function LockIcon() {
 }
 
 export function DispatchList({
-  actions,
+  items,
   role,
 }: {
-  actions: DispatchAction[];
+  items: DispatchListItem[];
   role: OpsRole;
 }) {
   const unlocked = canDispatch(role);
   const [state, setState] = useState<Record<string, ItemState>>({});
+  const keys = dispatchListKeys(items);
 
   return (
     <section data-ops-tour="dispatch" className="border-b border-[#1E2A40] px-4 py-3">
@@ -38,12 +44,14 @@ export function DispatchList({
         </p>
       )}
       <ul className="flex flex-col gap-2">
-        {actions.map((action) => {
+        {items.map((item, index) => {
+          const action = item.action;
           const st = state[action.actionId] ?? "open";
           const checked = st !== "open";
           return (
             <li
-              key={action.actionId}
+              key={keys[index]}
+              data-dispatch-key={keys[index]}
               className="rounded-md border border-[#1E2A40] bg-[#0B1220] p-2"
             >
               <div className="flex items-start gap-2">

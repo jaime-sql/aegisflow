@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { AgentOutput, DispatchAction } from "@/lib/schema";
 import { DispatchActionSchema } from "@/lib/schema/zod";
 import type { IngestEnv } from "@/lib/ingest/types";
+import { withUniqueActionIds } from "./action-ids";
 import type { AgentId, AgentRuntimeDeps, LlmCompletion, ModalInvokeResult } from "./types";
 
 export type LlmUsed = AgentOutput["model"]["used"];
@@ -206,7 +207,10 @@ export async function invokeModal(
   }
 }
 
-export function parseAgentJson(text: string): {
+export function parseAgentJson(
+  text: string,
+  scope: { agentId?: string; eventId?: string } = {},
+): {
   summary: string;
   confidence: number;
   recommendations: DispatchAction[];
@@ -227,7 +231,7 @@ export function parseAgentJson(text: string): {
   if (!Array.isArray(rec.recommendations) || rec.recommendations.length === 0) {
     throw new Error("LLM recommendations missing");
   }
-  const recommendations = rec.recommendations.slice(0, 6).map((row, index) => {
+  const rows = rec.recommendations.slice(0, 6).map((row, index) => {
     const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
     const actionIdRaw =
       typeof item.actionId === "string" && item.actionId.trim()
@@ -253,6 +257,7 @@ export function parseAgentJson(text: string): {
       resourceHint: typeof item.resourceHint === "string" ? item.resourceHint : undefined,
     });
   });
+  const recommendations = withUniqueActionIds(rows, scope);
   return { summary, confidence, recommendations };
 }
 
