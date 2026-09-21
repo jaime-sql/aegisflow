@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import type { AgentOutput, DispatchAction, IncidentEvent } from "@/lib/schema";
+import type { AgentOutput, IncidentEvent } from "@/lib/schema";
 import type { OpsRole } from "@/lib/auth/roles";
 import { ExecSummaryCard } from "./ExecSummaryCard";
 import { AgentChip } from "./AgentChip";
-import { DispatchList } from "./DispatchList";
+import { DispatchList, type DispatchListItem } from "./DispatchList";
 import { ResourceBars } from "./ResourceBars";
 import { TimelineScrubber } from "./TimelineScrubber";
 
@@ -24,10 +24,12 @@ export function RightRail({
   onViewLineage: () => void;
   ttsConfigured: boolean;
 }) {
-  const actions = useMemo(() => {
-    const rows: DispatchAction[] = [];
+  const items = useMemo(() => {
+    const rows: DispatchListItem[] = [];
     for (const agent of incident.agents) {
-      rows.push(...agent.recommendations);
+      for (const action of agent.recommendations) {
+        rows.push({ action, agentId: agent.agentId, eventId: agent.eventId });
+      }
     }
     return rows;
   }, [incident.agents]);
@@ -60,7 +62,7 @@ export function RightRail({
         </div>
       </section>
 
-      <DispatchList actions={actions} role={role} />
+      <DispatchList items={items} role={role} />
       <ResourceBars resources={incident.resources} />
       <TimelineScrubber items={incident.timeline} startedAt={incident.startedAt} />
     </aside>
