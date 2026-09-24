@@ -21,6 +21,13 @@ import {
 } from "../src/lib/ask/limits";
 import { ASK_DEEPSEEK_MODEL, ASK_OPENAI_MODEL } from "../src/lib/ask/models";
 import { handleAskSpeak } from "../src/lib/ask/speak";
+import {
+  MIC_ERROR_HINT,
+  micButtonLabel,
+  shouldAutoSpeak,
+  speechRecognitionCtor,
+  transcriptFromResults,
+} from "../src/lib/ask/speech";
 import { loadAskCount, saveAskCount, loadSpeakQuota, saveSpeakQuota } from "../src/lib/ask/storage";
 import { OPS_REGIONS } from "../src/lib/regions";
 import { REQUIRED_WORKER_SECRETS } from "../scripts/select-worker-secrets.mjs";
@@ -48,6 +55,77 @@ assert.match(OPS_ASK_HELP, /Feeds/);
 
 assert.equal(canAskOps("manager"), true);
 assert.equal(canAskOps("viewer"), true);
+
+assert.equal(
+  transcriptFromResults([
+    { 0: { transcript: "how do " } },
+    { 0: { transcript: "layers work" } },
+  ]),
+  "how do layers work",
+);
+assert.equal(transcriptFromResults(null), "");
+assert.equal(transcriptFromResults({ length: 0 }), "");
+
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: true,
+    configured: true,
+    capped: false,
+    answer: "Use the layer toggles.",
+  }),
+  true,
+);
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: false,
+    configured: true,
+    capped: false,
+    answer: "Use the layer toggles.",
+  }),
+  false,
+  "typed asks must not auto-speak",
+);
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: true,
+    configured: true,
+    capped: true,
+    answer: "Use the layer toggles.",
+  }),
+  false,
+);
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: true,
+    configured: false,
+    capped: false,
+    answer: "Use the layer toggles.",
+  }),
+  false,
+);
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: true,
+    configured: true,
+    capped: false,
+    answer: "   ",
+  }),
+  false,
+);
+assert.equal(micButtonLabel("listening", true), "Listening…");
+assert.equal(micButtonLabel("idle", true), "Mic");
+assert.equal(micButtonLabel("error", true), "Mic");
+assert.equal(micButtonLabel("listening", false), "Mic");
+assert.equal(MIC_ERROR_HINT.length > 0, true);
+
+class FakeRecognition {}
+assert.equal(
+  speechRecognitionCtor({ SpeechRecognition: FakeRecognition, webkitSpeechRecognition: class {} }),
+  FakeRecognition,
+);
+assert.equal(speechRecognitionCtor({ webkitSpeechRecognition: FakeRecognition }), FakeRecognition);
+assert.equal(speechRecognitionCtor({}), null);
+assert.equal(speechRecognitionCtor(null), null);
 assert.equal(canSpeakBrief("viewer"), true);
 assert.equal(canDispatch("viewer"), false);
 assert.equal(canDispatch("manager"), true);
@@ -402,19 +480,36 @@ function uiWiring() {
 
   const drawer = readFileSync("src/components/ops/AskOpsDrawer.tsx", "utf8");
   assert.match(drawer, /Speak answer/);
+  assert.match(drawer, /Speaking…/);
   assert.match(drawer, /ASK_LIMIT_HINT/);
   assert.match(drawer, /SPEAK_LIMIT_HINT/);
+  assert.match(drawer, /MIC_ERROR_HINT/);
   assert.match(drawer, /opsAskUrl/);
   assert.match(drawer, /opsAskSpeakUrl/);
   assert.match(drawer, /Escape/);
   assert.match(drawer, /Close Ask Ops/);
   assert.match(drawer, /slice\(0, 3\)/);
+  assert.match(drawer, /shouldAutoSpeak/);
+  assert.match(drawer, /voiceOrigin/);
+  assert.match(drawer, /speechRecognitionCtor/);
+  assert.match(drawer, /interimResults = true/);
+  const form = drawer.slice(drawer.indexOf("<form"));
+  const micAt = form.indexOf("onClick={onMic}");
+  const askSubmitAt = form.indexOf('type="submit"');
+  assert.ok(micAt > 0 && askSubmitAt > micAt, "Mic sits in the input row before Ask");
+  assert.doesNotMatch(drawer, /canDispatch/);
   assert.doesNotMatch(drawer, /toast|window\.alert|alert\(/);
-  assert.doesNotMatch(drawer, /convai|\/v1\/agents/);
+  assert.doesNotMatch(drawer, /convai|\/v1\/agents|how can I help/i);
+  assert.doesNotMatch(top, /speechRecognitionCtor|webkitSpeechRecognition/);
 
   const speak = readFileSync("src/lib/ask/speak.ts", "utf8");
   assert.match(speak, /synthesizeElevenLabs/);
   assert.doesNotMatch(speak, /convai|\/v1\/agents/);
+
+  const speech = readFileSync("src/lib/ask/speech.ts", "utf8");
+  assert.match(speech, /webkitSpeechRecognition/);
+  assert.match(speech, /SpeechRecognition/);
+  assert.doesNotMatch(speech, /elevenlabs|convai|\/v1\/agents/i);
 
   const briefRoute = readFileSync("src/app/api/ops/brief-aloud/route.ts", "utf8");
   assert.match(briefRoute, /handleBriefAloud/);
@@ -435,6 +530,10 @@ function uiWiring() {
   assert.match(docs, /20/);
   assert.match(docs, /15,000/);
   assert.match(docs, /select-worker-secrets/);
+  assert.match(docs, /Web Speech API/);
+  assert.match(docs, /voice-originated|voice ask/i);
+  assert.match(docs, /does not auto-Speak/);
+  assert.match(docs, /no ElevenLabs conversational agent/i);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/ask-ops\.check\.ts/);

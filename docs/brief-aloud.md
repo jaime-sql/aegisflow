@@ -1,6 +1,6 @@
 # Brief aloud (ElevenLabs TTS)
 
-**Brief aloud** on the Ops **exec summary** is listen-only play/stop for **Manager and Viewer**. Short radio-style clip (~15–30s), played in Ops. Not a podcast. Not on the agent recommendation chip (v1). Dispatch **Ack / Assign stays Manager-only**.
+**Brief aloud** on the Ops **exec summary** is listen-only play/stop for **Manager and Viewer**. Short radio-style clip (~15–30s), played in Ops. Not a podcast. Not on the agent recommendation chip (v1). Dispatch **Ack / Assign stays Manager-only**. Ask Ops Mic / Speak answer is a separate Q&A path (same ElevenLabs key and voice, not this control).
 
 WIND LIVE fill and deeper agent-key work stay parked.
 
