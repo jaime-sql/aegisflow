@@ -12,6 +12,15 @@ import {
   windOverlayColor,
 } from "@/lib/ui/wind-feed";
 import {
+  PREDICTED_DASH,
+  PREDICTED_FILL,
+  PREDICTED_FILL_OPACITY,
+  PREDICTED_STROKE_PX,
+  predictedSpreadGeoJson,
+  predictedSpreadPopupHtml,
+  propagationConeIsSim,
+} from "@/lib/ui/spread-cone";
+import {
   DEFAULT_LAYER_VISIBILITY,
   MAP_LAYER_KEYS,
   agentMapAnchor,
@@ -47,7 +56,7 @@ function drawHotspots(group: L.LayerGroup, incident: IncidentEvent) {
   const firmsDemoFixture = isFirmsDemoFixture(incident);
   for (const h of incident.hotspots) {
     L.circleMarker([h.lat, h.lon], {
-      radius: 5 + Math.min(h.brightnessK / 80, 8),
+      radius: 4 + Math.min(h.brightnessK / 140, 4),
       color: "#1a0e08",
       weight: 1,
       fillColor: hotspotColor(h.confidence),
@@ -62,8 +71,8 @@ function drawWind(group: L.LayerGroup, incident: IncidentEvent) {
   group.clearLayers();
   for (const w of incident.wind) {
     const dest = windDest(w);
-    const color = windOverlayColor(w);
     const live = isLiveWeatherNextWind(w);
+    const color = windOverlayColor(w);
     L.polyline(
       [
         [w.lat, w.lon],
@@ -71,12 +80,12 @@ function drawWind(group: L.LayerGroup, incident: IncidentEvent) {
       ],
       {
         color,
-        weight: 2,
-        opacity: live ? 0.9 : 0.7,
+        weight: live ? 2 : 1.5,
+        opacity: live ? 0.9 : 0.55,
       },
     ).addTo(group);
     L.circleMarker(dest, {
-      radius: 3,
+      radius: live ? 3 : 2.5,
       color,
       fillColor: color,
       fillOpacity: 1,
@@ -87,6 +96,29 @@ function drawWind(group: L.LayerGroup, incident: IncidentEvent) {
       )
       .addTo(group);
   }
+}
+
+/** Downwind sector from the primary cluster. Flat fill and a dashed stroke. */
+function drawPredicted(group: L.LayerGroup, incident: IncidentEvent) {
+  group.clearLayers();
+  const collection = predictedSpreadGeoJson(incident);
+  if (collection.features.length === 0) return;
+  const html = predictedSpreadPopupHtml(propagationConeIsSim(incident));
+  L.geoJSON(collection, {
+    style: () => ({
+      color: PREDICTED_FILL,
+      weight: PREDICTED_STROKE_PX,
+      opacity: 1,
+      dashArray: PREDICTED_DASH,
+      fillColor: PREDICTED_FILL,
+      fillOpacity: PREDICTED_FILL_OPACITY,
+      lineCap: "butt",
+      lineJoin: "round",
+    }),
+    onEachFeature: (_feature, layer) => {
+      layer.bindPopup(html);
+    },
+  }).addTo(group);
 }
 
 function drawAgents(group: L.LayerGroup, incident: IncidentEvent) {
@@ -164,6 +196,7 @@ function drawIncidentLayers(groups: LayerGroups, incident: IncidentEvent) {
   drawHotspots(groups.hotspots, incident);
   drawWind(groups.wind, incident);
   drawAgents(groups.agents, incident);
+  drawPredicted(groups.predicted, incident);
   drawExtras(groups.extras, incident);
 }
 
@@ -227,6 +260,7 @@ export function OpsMap({ incident }: { incident: IncidentEvent }) {
       hotspots: L.layerGroup(),
       wind: L.layerGroup(),
       agents: L.layerGroup(),
+      predicted: L.layerGroup(),
       extras: L.layerGroup().addTo(map),
     };
     groupsRef.current = groups;

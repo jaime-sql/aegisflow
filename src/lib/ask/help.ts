@@ -3,7 +3,7 @@
  * up to three agent lines. It is not a web search corpus.
  */
 export const OPS_ASK_HELP = [
-  "Layers: the map legend toggles Hotspots (NASA FIRMS or DEMO FIXTURE), Wind (Experimental WeatherNext 10 m, or Wind · fallback), and Agents. The map stays the primary view.",
+  "Layers: the map legend toggles Hotspots (NASA FIRMS or DEMO FIXTURE), Wind (Experimental WeatherNext 10 m, or Wind · fallback; Wind Live is WeatherNext only), Agents, and Predicted (agent spread cone, not a satellite layer). The map stays the primary view.",
   "Lineage: open an agent chip, then View lineage. The drawer cites the same hotspot and wind eventIds drawn on the map. Agents are Propagation, Evacuation, and Resources.",
   "Roles: Manager and Viewer can use Ask and Brief aloud. Ack and Assign stay Manager-only. Viewer sees dispatch locked.",
   "Region: the picker switches El Salvador / WUI (default) and Cascade (AegisFire-01) on this same map. It is not a second map.",

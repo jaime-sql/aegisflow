@@ -36,6 +36,15 @@ function LayerSwatch({
       />
     );
   }
+  if (layer === "predicted") {
+    return (
+      <span
+        className={`inline-block h-2 w-3 border border-dashed border-[#FF4D2E] ${dim}`}
+        style={{ backgroundColor: "rgba(255,77,46,0.18)" }}
+        aria-hidden
+      />
+    );
+  }
   return (
     <span
       className={`h-2 w-2 rotate-45 border-2 border-[#3DB9FF] bg-[#121A2B] ${dim}`}
@@ -45,8 +54,8 @@ function LayerSwatch({
 }
 
 /**
- * Compact map legend: Hotspots / Wind / Agents toggles with live counts,
- * then one honest feed-age line. Extra feed toggles stay out of the stack.
+ * Compact map legend: Hotspots / Wind / Agents / Predicted toggles with live
+ * counts, then one honest feed-age line. Extra feed toggles stay out of the stack.
  * Incident dossier / judge-path chrome are follow-ups — do not add them here.
  */
 export function MapLegendStack({

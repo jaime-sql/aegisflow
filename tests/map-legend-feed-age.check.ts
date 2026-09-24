@@ -177,17 +177,20 @@ function countsMatchIncidentArrays() {
   assert.equal(counts.hotspots, fixture.hotspots.length);
   assert.equal(counts.wind, fixture.wind.length);
   assert.equal(counts.agents, fixture.agents.length);
+  assert.equal(counts.predicted, 1);
   assert.equal(counts.agents, 3);
-  assert.deepEqual([...MAP_LAYER_KEYS], ["hotspots", "wind", "agents"]);
+  assert.deepEqual([...MAP_LAYER_KEYS], ["hotspots", "wind", "agents", "predicted"]);
   assert.equal(MAP_LAYER_LABELS.hotspots, "Hotspots");
   assert.equal(MAP_LAYER_LABELS.wind, "Wind");
   assert.equal(MAP_LAYER_LABELS.agents, "Agents");
+  assert.equal(MAP_LAYER_LABELS.predicted, "Predicted");
 
   const empty = { ...fixture, hotspots: [], wind: [], agents: [] };
   assert.deepEqual(mapLayerCounts(empty), {
     hotspots: 0,
     wind: 0,
     agents: 0,
+    predicted: 0,
   });
 }
 
@@ -286,6 +289,9 @@ function uiWiring() {
   assert.match(map, /drawHotspots/);
   assert.match(map, /drawWind/);
   assert.match(map, /drawAgents/);
+  assert.match(map, /drawPredicted/);
+  assert.match(map, /PREDICTED_FILL_OPACITY/);
+  assert.match(map, /PREDICTED_DASH/);
   assert.match(map, /applyLayerVisibility/);
   assert.match(map, /map\.hasLayer/);
   assert.match(map, /map\.removeLayer/);
