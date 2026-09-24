@@ -21,6 +21,15 @@ import {
   type SpeakQuota,
 } from "@/lib/ask/limits";
 import { loadAskCount, loadSpeakQuota, saveAskCount, saveSpeakQuota } from "@/lib/ask/storage";
+import {
+  MIC_DENIED_HINT,
+  micAriaLabel,
+  shouldAutoSpeak,
+  speechRecognitionCtor,
+  transcriptFromResults,
+  type BrowserSpeechRecognition,
+  type MicPhase,
+} from "@/lib/ask/speech";
 import { SimBadge } from "./SimBadge";
 
 type Turn = {
@@ -60,11 +69,31 @@ export function AskOpsDrawer({
   const [speakState, setSpeakState] = useState<"idle" | "speaking" | "sim">(
     configured ? "idle" : "sim",
   );
+  const [micPhase, setMicPhase] = useState<MicPhase>("idle");
+  const [micSupported, setMicSupported] = useState(true);
   const idRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const questionRef = useRef("");
+  const askingRef = useRef(false);
+  const speakQuotaRef = useRef(speakQuota);
+  const configuredRef = useRef(configured);
+  const autoSpeakRef = useRef<string | null>(null);
+  const speakTextRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const submitRef = useRef<(text: string, voiceOrigin: boolean) => Promise<void>>(
+    async () => {},
+  );
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const micWantedRef = useRef(false);
+  const micFailedRef = useRef(false);
+  const openRef = useRef(open);
+
+  questionRef.current = question;
+  speakQuotaRef.current = speakQuota;
+  configuredRef.current = configured;
+  openRef.current = open;
 
   function stopPlayback() {
     abortRef.current?.abort();
@@ -83,6 +112,26 @@ export function AskOpsDrawer({
       objectUrlRef.current = null;
     }
   }
+
+  function abortMic() {
+    micWantedRef.current = false;
+    const rec = recognitionRef.current;
+    recognitionRef.current = null;
+    if (!rec) return;
+    rec.onstart = null;
+    rec.onresult = null;
+    rec.onerror = null;
+    rec.onend = null;
+    try {
+      rec.abort();
+    } catch {
+      /* already stopped */
+    }
+  }
+
+  useEffect(() => {
+    setMicSupported(speechRecognitionCtor(window) !== null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -104,7 +153,9 @@ export function AskOpsDrawer({
 
   useEffect(() => {
     if (!open) {
+      abortMic();
       stopPlayback();
+      setMicPhase("idle");
       return;
     }
     function onKey(event: KeyboardEvent) {
@@ -113,94 +164,66 @@ export function AskOpsDrawer({
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
+      abortMic();
       stopPlayback();
     };
   }, [open]);
 
   useEffect(() => {
-    setSpeakState(configured ? "idle" : "sim");
+    if (!openRef.current) {
+      autoSpeakRef.current = null;
+      stopPlayback();
+      setSpeakState(configuredRef.current ? "idle" : "sim");
+      return;
+    }
+    const pending = autoSpeakRef.current;
+    const capped = speakUiCapped(speakQuotaRef.current, utcDay());
+    const speakNow =
+      Boolean(pending) &&
+      shouldAutoSpeak({
+        voiceOrigin: true,
+        configured: configuredRef.current,
+        capped,
+        answer: pending ?? "",
+      });
+    if (!speakNow) {
+      autoSpeakRef.current = null;
+      stopPlayback();
+      setSpeakState(configuredRef.current ? "idle" : "sim");
+      return;
+    }
     stopPlayback();
-  }, [configured, turns.length]);
+    const text = pending ?? "";
+    // Defer so a Strict Mode effect replay can cancel the first timer
+    // without dropping the voice-origin clip.
+    const timer = window.setTimeout(() => {
+      if (autoSpeakRef.current !== text || !openRef.current) return;
+      autoSpeakRef.current = null;
+      void speakTextRef.current(text);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [configured, turns.length, open]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [turns, asking]);
 
-  if (!open) return null;
-
   const atAskLimit = !canConsumeAsk(askCount);
   const speakCapped = speakUiCapped(speakQuota, utcDay());
   const latest = turns[turns.length - 1];
   const latestReply = latest?.role === "ops" ? latest : null;
+  const listening = micPhase === "listening";
+  const micMuted = !micSupported || micPhase === "error";
 
-  async function onAsk(event: FormEvent) {
-    event.preventDefault();
-    const q = question.trim();
-    if (!q || asking) return;
-    if (atAskLimit) {
-      setHint(ASK_LIMIT_HINT);
+  async function speakText(text: string) {
+    if (!configuredRef.current) {
+      setSpeakState("sim");
       return;
     }
-    setHint(null);
-    setAsking(true);
-    const userTurn: Turn = { id: `u${++idRef.current}`, role: "user", text: q };
-    setTurns((prev) => [...prev, userTurn]);
-    setQuestion("");
-    try {
-      const res = await fetch(opsAskUrl(), {
-        method: "POST",
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          question: q.slice(0, ASK_QUESTION_MAX),
-          regionId: incident.region.id,
-          agents: incident.agents.slice(0, 3).map((agent) => ({
-            title: agent.title,
-            summary: agent.summary,
-          })),
-        }),
-      });
-      const data = (await res.json()) as AskPayload;
-      if (data.limited) {
-        setAskCount(ASK_SESSION_LIMIT);
-        saveAskCount(ASK_SESSION_LIMIT);
-        setHint(data.hint || ASK_LIMIT_HINT);
-        return;
-      }
-      if (!data.ok || !data.answer) {
-        setHint(data.answer || data.hint || "Ask unavailable — try again.");
-        return;
-      }
-      setTurns((prev) => [
-        ...prev,
-        {
-          id: `a${++idRef.current}`,
-          role: "ops",
-          text: data.answer!,
-          sim: Boolean(data.sim),
-          model: data.model ?? null,
-        },
-      ]);
-      setAskCount((prev) => {
-        const next = Math.min(ASK_SESSION_LIMIT, prev + 1);
-        saveAskCount(next);
-        return next;
-      });
-    } catch {
-      setHint("Ask unavailable — try again.");
-    } finally {
-      setAsking(false);
-    }
-  }
-
-  async function onSpeak() {
-    if (speakState === "speaking") {
-      stopPlayback();
-      setSpeakState(configured ? "idle" : "sim");
+    if (speakUiCapped(speakQuotaRef.current, utcDay())) {
+      setSpeakState("idle");
       return;
     }
-    if (!latestReply || speakState === "sim" || speakCapped) return;
     setSpeakState("speaking");
     const ac = new AbortController();
     abortRef.current = ac;
@@ -210,7 +233,7 @@ export function AskOpsDrawer({
         cache: "no-store",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: latestReply.text }),
+        body: JSON.stringify({ text }),
         signal: ac.signal,
       });
       if (ac.signal.aborted) return;
@@ -236,7 +259,7 @@ export function AskOpsDrawer({
           };
           setSpeakQuota(capped);
           saveSpeakQuota(capped);
-          setSpeakState(configured ? "idle" : "sim");
+          setSpeakState(configuredRef.current ? "idle" : "sim");
           return;
         }
         setSpeakState("sim");
@@ -255,14 +278,14 @@ export function AskOpsDrawer({
       audioRef.current = audio;
       audio.onended = () => {
         stopPlayback();
-        setSpeakState(configured ? "idle" : "sim");
+        setSpeakState(configuredRef.current ? "idle" : "sim");
       };
       audio.onerror = () => {
         stopPlayback();
         setSpeakState("sim");
       };
       const day = utcDay();
-      const spokenChars = clipSpeakText(latestReply.text).length;
+      const spokenChars = clipSpeakText(text).length;
       setSpeakQuota((prev) => {
         const next = consumeSpeak(prev, spokenChars, day);
         saveSpeakQuota(next);
@@ -275,9 +298,175 @@ export function AskOpsDrawer({
       setSpeakState("sim");
     }
   }
+  speakTextRef.current = speakText;
+
+  async function submitQuestion(raw: string, voiceOrigin: boolean) {
+    const q = raw.trim().slice(0, ASK_QUESTION_MAX);
+    if (!q || askingRef.current) return;
+    if (!canConsumeAsk(askCount)) {
+      setHint(ASK_LIMIT_HINT);
+      return;
+    }
+    setHint(null);
+    askingRef.current = true;
+    setAsking(true);
+    const userTurn: Turn = { id: `u${++idRef.current}`, role: "user", text: q };
+    setTurns((prev) => [...prev, userTurn]);
+    questionRef.current = "";
+    setQuestion("");
+    try {
+      const res = await fetch(opsAskUrl(), {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          regionId: incident.region.id,
+          agents: incident.agents.slice(0, 3).map((agent) => ({
+            title: agent.title,
+            summary: agent.summary,
+          })),
+        }),
+      });
+      const data = (await res.json()) as AskPayload;
+      if (data.limited) {
+        setAskCount(ASK_SESSION_LIMIT);
+        saveAskCount(ASK_SESSION_LIMIT);
+        setHint(data.hint || ASK_LIMIT_HINT);
+        return;
+      }
+      if (!data.ok || !data.answer) {
+        setHint(data.answer || data.hint || "Ask unavailable — try again.");
+        return;
+      }
+      const answer = data.answer;
+      if (
+        openRef.current &&
+        shouldAutoSpeak({
+          voiceOrigin,
+          configured,
+          capped: speakUiCapped(speakQuotaRef.current, utcDay()),
+          answer,
+        })
+      ) {
+        autoSpeakRef.current = answer;
+        setSpeakState("speaking");
+      }
+      setTurns((prev) => [
+        ...prev,
+        {
+          id: `a${++idRef.current}`,
+          role: "ops",
+          text: answer,
+          sim: Boolean(data.sim),
+          model: data.model ?? null,
+        },
+      ]);
+      setAskCount((prev) => {
+        const next = Math.min(ASK_SESSION_LIMIT, prev + 1);
+        saveAskCount(next);
+        return next;
+      });
+    } catch {
+      setHint("Ask unavailable — try again.");
+    } finally {
+      askingRef.current = false;
+      setAsking(false);
+    }
+  }
+  submitRef.current = submitQuestion;
+
+  function onAsk(event: FormEvent) {
+    event.preventDefault();
+    const voiceOrigin = listening;
+    abortMic();
+    setMicPhase("idle");
+    void submitRef.current(questionRef.current, voiceOrigin);
+  }
+
+  function onMic() {
+    if (listening) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        abortMic();
+        setMicPhase("idle");
+      }
+      return;
+    }
+    if (askingRef.current || atAskLimit) return;
+    const Ctor = speechRecognitionCtor(window);
+    if (!Ctor) {
+      setMicSupported(false);
+      setMicPhase("error");
+      return;
+    }
+
+    abortMic();
+    stopPlayback();
+    setSpeakState(configured ? "idle" : "sim");
+
+    const prior = questionRef.current;
+    const rec = new Ctor();
+    rec.lang = navigator.language || "en-US";
+    rec.continuous = false;
+    rec.interimResults = true;
+    recognitionRef.current = rec;
+    micWantedRef.current = true;
+    micFailedRef.current = false;
+
+    rec.onstart = () => setMicPhase("listening");
+    rec.onresult = (event) => {
+      const text = transcriptFromResults(event.results).slice(0, ASK_QUESTION_MAX);
+      questionRef.current = text;
+      setQuestion(text);
+    };
+    rec.onerror = (event) => {
+      const code = event.error ?? "";
+      if (code === "aborted") return;
+      micFailedRef.current = true;
+    };
+    rec.onend = () => {
+      const heard = questionRef.current.trim();
+      const wanted = micWantedRef.current;
+      const failed = micFailedRef.current;
+      recognitionRef.current = null;
+      micWantedRef.current = false;
+      if (!wanted) return;
+      if (failed || !heard) {
+        questionRef.current = prior;
+        setQuestion(prior);
+        setMicPhase("error");
+        return;
+      }
+      setMicPhase("idle");
+      void submitRef.current(heard, true);
+    };
+
+    try {
+      rec.start();
+      setMicPhase("listening");
+    } catch {
+      abortMic();
+      setMicPhase("error");
+    }
+  }
+
+  async function onSpeak() {
+    if (speakState === "speaking") {
+      stopPlayback();
+      setSpeakState(configured ? "idle" : "sim");
+      return;
+    }
+    if (!latestReply || speakState === "sim" || speakCapped) return;
+    await speakText(latestReply.text);
+  }
 
   const speakMuted = speakState === "sim" || !configured;
   const speaking = speakState === "speaking";
+
+  if (!open) return null;
 
   return (
     <div className="absolute inset-0 z-[800]">
@@ -336,41 +525,43 @@ export function AskOpsDrawer({
                       <span className="font-mono text-[9px] text-[#8B9BB8]">{turn.model}</span>
                     ) : null}
                     {isLatestReply ? (
-                      <button
-                        type="button"
-                        onClick={onSpeak}
-                        disabled={(speakMuted || speakCapped) && !speaking}
-                        aria-label={
-                          speakCapped
-                            ? SPEAK_LIMIT_HINT
-                            : speakMuted
-                              ? "Speak answer unavailable"
+                      <div className="flex flex-col items-start gap-0.5">
+                        <button
+                          type="button"
+                          onClick={onSpeak}
+                          disabled={(speakMuted || speakCapped) && !speaking}
+                          aria-label={
+                            speakCapped
+                              ? SPEAK_LIMIT_HINT
+                              : speakMuted
+                                ? "Speak answer unavailable"
+                                : speaking
+                                  ? "Stop speak"
+                                  : "Speak answer"
+                          }
+                          className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+                            speakMuted || speakCapped
+                              ? "cursor-not-allowed border-[#1E2A40] text-[#8B9BB8]"
                               : speaking
-                                ? "Stop speak"
-                                : "Speak answer"
-                        }
-                        className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
-                          speakMuted || speakCapped
-                            ? "cursor-not-allowed border-[#1E2A40] text-[#8B9BB8]"
-                            : speaking
-                              ? "border-[#3DB9FF]/50 text-[#3DB9FF]"
-                              : "border-[#3DB9FF]/40 text-[#3DB9FF] hover:bg-[#3DB9FF]/10"
-                        }`}
-                      >
-                        {speakMuted ? (
-                          <>
-                            Speak answer
-                            <SimBadge />
-                          </>
-                        ) : speaking ? (
-                          <span aria-live="polite">Speaking…</span>
-                        ) : (
-                          "Speak answer"
-                        )}
-                      </button>
-                    ) : null}
-                    {isLatestReply && speakCapped ? (
-                      <span className="font-mono text-[10px] text-[#8B9BB8]">{SPEAK_LIMIT_HINT}</span>
+                                ? "ask-speak-pulse border-[#22D3EE]/60 text-[#22D3EE]"
+                                : "border-[#3DB9FF]/40 text-[#3DB9FF] hover:bg-[#3DB9FF]/10"
+                          }`}
+                        >
+                          {speakMuted ? (
+                            <>
+                              Speak answer
+                              <SimBadge />
+                            </>
+                          ) : speaking ? (
+                            <span aria-live="polite">Speaking…</span>
+                          ) : (
+                            "Speak answer"
+                          )}
+                        </button>
+                        {speakCapped ? (
+                          <span className="font-mono text-[10px] text-[#8B9BB8]">{SPEAK_LIMIT_HINT}</span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -395,11 +586,34 @@ export function AskOpsDrawer({
             </p>
           ) : null}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onMic}
+              disabled={(!listening && (asking || atAskLimit)) || !micSupported}
+              aria-pressed={listening}
+              aria-label={micAriaLabel(micPhase, micSupported)}
+              title={micMuted ? MIC_DENIED_HINT : undefined}
+              className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-transparent ${
+                micMuted
+                  ? "cursor-not-allowed text-[#94A3B8]/40"
+                  : listening
+                    ? "ask-mic-ring text-[#22D3EE]"
+                    : "text-[#94A3B8] hover:bg-[#94A3B8]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              }`}
+            >
+              <MicGlyph filled={listening} />
+            </button>
+            {micMuted ? <SimBadge /> : null}
             <input
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              onChange={(event) => {
+                questionRef.current = event.target.value;
+                setQuestion(event.target.value);
+                if (micPhase === "error") setMicPhase("idle");
+              }}
               maxLength={ASK_QUESTION_MAX}
               disabled={asking || atAskLimit}
+              readOnly={listening}
               placeholder="Layers, lineage, roles, region, feeds…"
               aria-label="Ask Ops"
               className="min-w-0 flex-1 rounded border border-[#1E2A40] bg-[#0B1220] px-2 py-1 text-[12px] text-[#E8EEF9] outline-none placeholder:text-[#8B9BB8] disabled:opacity-60"
@@ -420,4 +634,26 @@ export function AskOpsDrawer({
 
 function emptyDay(): SpeakQuota {
   return { day: utcDay(), speaks: 0, chars: 0 };
+}
+
+/** 16px outline mic. Listening fills the capsule; the stand stays a stroke. */
+function MicGlyph({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="3" width="6" height="11" rx="3" fill={filled ? "currentColor" : "none"} />
+      <path d="M6 11a6 6 0 0 0 12 0" />
+      <path d="M12 17v3" />
+      <path d="M8 20h8" />
+    </svg>
+  );
 }
