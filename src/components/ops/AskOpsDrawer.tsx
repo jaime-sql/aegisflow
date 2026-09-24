@@ -22,8 +22,8 @@ import {
 } from "@/lib/ask/limits";
 import { loadAskCount, loadSpeakQuota, saveAskCount, saveSpeakQuota } from "@/lib/ask/storage";
 import {
-  MIC_ERROR_HINT,
-  micButtonLabel,
+  MIC_DENIED_HINT,
+  micAriaLabel,
   shouldAutoSpeak,
   speechRecognitionCtor,
   transcriptFromResults,
@@ -213,7 +213,7 @@ export function AskOpsDrawer({
   const latest = turns[turns.length - 1];
   const latestReply = latest?.role === "ops" ? latest : null;
   const listening = micPhase === "listening";
-  const micLabel = micButtonLabel(micPhase, micSupported);
+  const micMuted = !micSupported || micPhase === "error";
 
   async function speakText(text: string) {
     if (!configuredRef.current) {
@@ -400,7 +400,6 @@ export function AskOpsDrawer({
     if (!Ctor) {
       setMicSupported(false);
       setMicPhase("error");
-      setHint(MIC_ERROR_HINT);
       return;
     }
 
@@ -439,7 +438,6 @@ export function AskOpsDrawer({
         questionRef.current = prior;
         setQuestion(prior);
         setMicPhase("error");
-        setHint(MIC_ERROR_HINT);
         return;
       }
       setMicPhase("idle");
@@ -452,7 +450,6 @@ export function AskOpsDrawer({
     } catch {
       abortMic();
       setMicPhase("error");
-      setHint(MIC_ERROR_HINT);
     }
   }
 
@@ -528,41 +525,43 @@ export function AskOpsDrawer({
                       <span className="font-mono text-[9px] text-[#8B9BB8]">{turn.model}</span>
                     ) : null}
                     {isLatestReply ? (
-                      <button
-                        type="button"
-                        onClick={onSpeak}
-                        disabled={(speakMuted || speakCapped) && !speaking}
-                        aria-label={
-                          speakCapped
-                            ? SPEAK_LIMIT_HINT
-                            : speakMuted
-                              ? "Speak answer unavailable"
+                      <div className="flex flex-col items-start gap-0.5">
+                        <button
+                          type="button"
+                          onClick={onSpeak}
+                          disabled={(speakMuted || speakCapped) && !speaking}
+                          aria-label={
+                            speakCapped
+                              ? SPEAK_LIMIT_HINT
+                              : speakMuted
+                                ? "Speak answer unavailable"
+                                : speaking
+                                  ? "Stop speak"
+                                  : "Speak answer"
+                          }
+                          className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+                            speakMuted || speakCapped
+                              ? "cursor-not-allowed border-[#1E2A40] text-[#8B9BB8]"
                               : speaking
-                                ? "Stop speak"
-                                : "Speak answer"
-                        }
-                        className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
-                          speakMuted || speakCapped
-                            ? "cursor-not-allowed border-[#1E2A40] text-[#8B9BB8]"
-                            : speaking
-                              ? "border-[#3DB9FF]/50 text-[#3DB9FF]"
-                              : "border-[#3DB9FF]/40 text-[#3DB9FF] hover:bg-[#3DB9FF]/10"
-                        }`}
-                      >
-                        {speakMuted ? (
-                          <>
-                            Speak answer
-                            <SimBadge />
-                          </>
-                        ) : speaking ? (
-                          <span aria-live="polite">Speaking…</span>
-                        ) : (
-                          "Speak answer"
-                        )}
-                      </button>
-                    ) : null}
-                    {isLatestReply && speakCapped ? (
-                      <span className="font-mono text-[10px] text-[#8B9BB8]">{SPEAK_LIMIT_HINT}</span>
+                                ? "ask-speak-pulse border-[#22D3EE]/60 text-[#22D3EE]"
+                                : "border-[#3DB9FF]/40 text-[#3DB9FF] hover:bg-[#3DB9FF]/10"
+                          }`}
+                        >
+                          {speakMuted ? (
+                            <>
+                              Speak answer
+                              <SimBadge />
+                            </>
+                          ) : speaking ? (
+                            <span aria-live="polite">Speaking…</span>
+                          ) : (
+                            "Speak answer"
+                          )}
+                        </button>
+                        {speakCapped ? (
+                          <span className="font-mono text-[10px] text-[#8B9BB8]">{SPEAK_LIMIT_HINT}</span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -587,15 +586,30 @@ export function AskOpsDrawer({
             </p>
           ) : null}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onMic}
+              disabled={(!listening && (asking || atAskLimit)) || !micSupported}
+              aria-pressed={listening}
+              aria-label={micAriaLabel(micPhase, micSupported)}
+              title={micMuted ? MIC_DENIED_HINT : undefined}
+              className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-transparent ${
+                micMuted
+                  ? "cursor-not-allowed text-[#94A3B8]/40"
+                  : listening
+                    ? "ask-mic-ring text-[#22D3EE]"
+                    : "text-[#94A3B8] hover:bg-[#94A3B8]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              }`}
+            >
+              <MicGlyph filled={listening} />
+            </button>
+            {micMuted ? <SimBadge /> : null}
             <input
               value={question}
               onChange={(event) => {
                 questionRef.current = event.target.value;
                 setQuestion(event.target.value);
-                if (micPhase === "error") {
-                  setMicPhase("idle");
-                  setHint((prev) => (prev === MIC_ERROR_HINT ? null : prev));
-                }
+                if (micPhase === "error") setMicPhase("idle");
               }}
               maxLength={ASK_QUESTION_MAX}
               disabled={asking || atAskLimit}
@@ -604,40 +618,6 @@ export function AskOpsDrawer({
               aria-label="Ask Ops"
               className="min-w-0 flex-1 rounded border border-[#1E2A40] bg-[#0B1220] px-2 py-1 text-[12px] text-[#E8EEF9] outline-none placeholder:text-[#8B9BB8] disabled:opacity-60"
             />
-            <button
-              type="button"
-              onClick={onMic}
-              disabled={(!listening && (asking || atAskLimit)) || !micSupported}
-              aria-pressed={listening}
-              aria-label={
-                !micSupported
-                  ? MIC_ERROR_HINT
-                  : listening
-                    ? "Stop listening"
-                    : micPhase === "error"
-                      ? MIC_ERROR_HINT
-                      : "Mic"
-              }
-              title={!micSupported || micPhase === "error" ? MIC_ERROR_HINT : listening ? "Listening…" : "Mic"}
-              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wider ${
-                !micSupported
-                  ? "cursor-not-allowed border-[#1E2A40] text-[#8B9BB8]"
-                  : listening
-                    ? "border-[#3DB9FF] text-[#3DB9FF]"
-                    : micPhase === "error"
-                      ? "border-[#FF4D2E]/70 text-[#FF4D2E]"
-                      : "border-[#3DB9FF]/45 text-[#3DB9FF] hover:bg-[#3DB9FF]/10 disabled:cursor-not-allowed disabled:opacity-50"
-              }`}
-            >
-              {listening ? (
-                <span
-                  className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#3DB9FF]"
-                  aria-hidden="true"
-                />
-              ) : null}
-              <span aria-live="polite">{micLabel}</span>
-              {!micSupported ? <SimBadge /> : null}
-            </button>
             <button
               type="submit"
               disabled={asking || atAskLimit || !question.trim()}
@@ -654,4 +634,26 @@ export function AskOpsDrawer({
 
 function emptyDay(): SpeakQuota {
   return { day: utcDay(), speaks: 0, chars: 0 };
+}
+
+/** 16px outline mic. Listening fills the capsule; the stand stays a stroke. */
+function MicGlyph({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="3" width="6" height="11" rx="3" fill={filled ? "currentColor" : "none"} />
+      <path d="M6 11a6 6 0 0 0 12 0" />
+      <path d="M12 17v3" />
+      <path d="M8 20h8" />
+    </svg>
+  );
 }

@@ -18,7 +18,7 @@ export const ASK_COUNT_COOKIE = "aegisflow_ask_n";
 export const SPEAK_QUOTA_COOKIE = "aegisflow_speak_day";
 
 export const ASK_LIMIT_HINT = "Session limit — 10 asks.";
-export const SPEAK_LIMIT_HINT = "Daily limit";
+export const SPEAK_LIMIT_HINT = "Daily Speak limit · ~20";
 
 export type SpeakQuota = {
   day: string;

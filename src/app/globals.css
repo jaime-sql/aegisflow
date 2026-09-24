@@ -94,6 +94,33 @@ body {
   transform: rotate(45deg);
 }
 
+/* Ask voice listening ring. Design: soft pulse, 1.5s, cyan #22D3EE. */
+@keyframes ask-mic-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(34 211 238 / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(34 211 238 / 0);
+  }
+}
+.ask-mic-ring {
+  animation: ask-mic-ring 1.5s ease-out infinite;
+}
+
+@keyframes ask-speak-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.ask-speak-pulse {
+  animation: ask-speak-pulse 1.5s ease-in-out infinite;
+}
+
 .ops-agent-diamond span {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;

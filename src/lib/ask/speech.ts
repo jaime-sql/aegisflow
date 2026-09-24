@@ -3,7 +3,9 @@
  * Mic failure falls back to typed Ask. This module does not synthesize audio.
  */
 
-export const MIC_ERROR_HINT = "Mic unavailable — type your question.";
+export const MIC_IDLE_LABEL = "Ask with voice";
+/** Denied or unsupported. Tooltip copy, not a toast. */
+export const MIC_DENIED_HINT = "Mic unavailable · type instead";
 
 export type MicPhase = "idle" | "listening" | "error";
 
@@ -57,9 +59,11 @@ export function shouldAutoSpeak(input: AutoSpeakInput): boolean {
   return input.answer.trim().length > 0;
 }
 
-export function micButtonLabel(phase: MicPhase, supported: boolean): string {
-  if (supported && phase === "listening") return "Listening…";
-  return "Mic";
+/** Idle label is the locked aria-label. Denied/unsupported uses the tooltip string. */
+export function micAriaLabel(phase: MicPhase, supported: boolean): string {
+  if (!supported || phase === "error") return MIC_DENIED_HINT;
+  if (phase === "listening") return "Stop listening";
+  return MIC_IDLE_LABEL;
 }
 
 type SpeechHost = {
