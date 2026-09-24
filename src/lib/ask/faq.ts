@@ -14,7 +14,7 @@ export type FaqTopic =
 
 const FAQ_COPY: Record<Exclude<FaqTopic, "situation">, string> = {
   layers:
-    "Map layers are Hotspots, Wind, and Agents. Toggle them on the legend. Hotspots are NASA FIRMS or a DEMO FIXTURE. Wind is Experimental WeatherNext 10 m, or Wind · fallback when the cache is stale. Feed age stays honest.",
+    "Map layers are Hotspots, Wind, Agents, and Predicted. Toggle them on the legend. Predicted is the agent spread cone, labeled Predicted, and is not a satellite layer. Hotspots are NASA FIRMS or a DEMO FIXTURE. Wind is Experimental WeatherNext 10 m, or Wind · fallback when the cache is stale. Wind Live is WeatherNext only. Feed age stays honest.",
   lineage:
     "Open an agent chip in the right rail, then View lineage. The drawer cites the same hotspot and wind eventIds the map is plotting. Agents are Propagation, Evacuation, and Resources.",
   roles:

@@ -75,7 +75,7 @@ export const OPS_REGIONS: Record<RegionId, OpsRegion> = {
     bbox: CASCADE_BBOX,
     maxZoom: 12,
     executiveSummary:
-      "Wind-driven timber/WUI fire west of Sisters (Cascade Range mock). VIIRS cluster aligned with WSW 12 m/s; 6-hour envelope toward the Hwy 20 corridor. Hold DP-12, keep Hwy 20 eastbound as egress, commit engines + tanker.",
+      "Wind-driven timber/WUI fire west of Sisters (Cascade Range mock). VIIRS clusters aligned with WSW flow; predicted 6-hour envelope toward the Hwy 20 corridor. Hold DP-12, keep Hwy 20 eastbound as egress, commit engines + tanker.",
   },
 };
 
