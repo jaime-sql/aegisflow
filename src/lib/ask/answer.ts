@@ -1,6 +1,7 @@
 import { canAskOps, type OpsRole } from "@/lib/auth/roles";
 import { resolveOpsRegion } from "@/lib/regions";
 import { answerFaq } from "./faq";
+import { presentAskAnswer } from "./present";
 import { clampQuestion } from "./help";
 import {
   ASK_LIMIT_HINT,
@@ -95,9 +96,10 @@ export async function handleAsk(deps: AskDeps): Promise<Response> {
       agents: deps.agents,
     });
     const completion = await completeAskText(messages, env, deps.fetch ?? fetch);
-    const answer =
-      completion.text ??
-      answerFaq(question, { executiveSummary: region.executiveSummary, label: region.label });
+    const regionFacts = { executiveSummary: region.executiveSummary, label: region.label };
+    const answer = completion.text
+      ? presentAskAnswer(question, completion.text, regionFacts)
+      : answerFaq(question, regionFacts);
     const sim = completion.source === "faq" || !completion.text;
 
     return jsonResponse(

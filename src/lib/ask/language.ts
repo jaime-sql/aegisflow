@@ -6,7 +6,11 @@
 export type AskReplyLanguage = "en" | "es";
 
 const SPANISH_SIGNAL =
-  /[áéíóúüñ¿¡]|\b(hola|gracias|por favor|buenos|buenas|d[ií]as|tardes|noches|c[oó]mo|qu[eé]|cu[aá]l|puedes|puede|hablas|habla|hablar|espa[nñ]ol|espanol|capas?|linaje|despacho|situaci[oó]n|ayuda|necesito|quisiera|viento|leyenda|fuentes?|incendio|d[oó]nde|tambi[eé]n|agentes?|propagaci[oó]n|evacuaci[oó]n)\b/i;
+  /[áéíóúüñ¿¡]|\b(hola|gracias|por favor|buenos|buenas|d[ií]as|tardes|noches|c[oó]mo|qu[eé]|cu[aá]l|puedes|puede|puedo|hablo|hablas|habla|hablar|espa[nñ]ol|espanol|capas?|linaje|despacho|situaci[oó]n|ayuda|ayudarte|necesito|necesitas|quisiera|viento|leyenda|fuentes?|incendio|d[oó]nde|tambi[eé]n|agentes?|propagaci[oó]n|evacuaci[oó]n|aqu[ií]|estoy|claro)\b/i;
+
+export function textLooksSpanish(text: string): boolean {
+  return SPANISH_SIGNAL.test(text);
+}
 
 const LANGUAGE_ASK =
   /\b(speak|hablas?|hablar|language|idioma|puedes|puede|can you|do you|sabes)\b/i;

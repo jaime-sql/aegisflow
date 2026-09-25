@@ -1,4 +1,12 @@
 import type { OpsRegion } from "@/lib/regions";
+import {
+  GREETING_EN,
+  GREETING_ES,
+  LANGUAGE_EN,
+  LANGUAGE_ES,
+  REFUSE_EN,
+  REFUSE_ES,
+} from "./copy";
 import { OPS_ASK_HELP } from "./help";
 import {
   askReplyLanguage,
@@ -33,8 +41,7 @@ const FAQ_COPY: Record<Exclude<FaqTopic, "situation" | "greeting">, string> = {
   speak:
     "Brief aloud on the exec summary plays a short clip for Manager and Viewer. Speak answer reads only the latest Ask reply and stops at the daily limit. A missing ElevenLabs key shows muted SIM.",
   help: `Ask about layers, lineage, roles, region, or feeds. ${OPS_ASK_HELP}`,
-  scope:
-    "I can help with this incident and how to use Ops (layers, lineage, roles, region, feeds).",
+  scope: REFUSE_EN,
 };
 
 const FAQ_ES: Record<Exclude<FaqTopic, "situation" | "greeting" | "scope">, string> = {
@@ -52,21 +59,6 @@ const FAQ_ES: Record<Exclude<FaqTopic, "situation" | "greeting" | "scope">, stri
     "Brief aloud en el resumen ejecutivo reproduce un clip corto para Manager y Viewer. Speak answer lee solo la última respuesta de Ask y se detiene en el límite diario. Sin clave de ElevenLabs se muestra SIM en silencio.",
   help: "Pregunta sobre capas, linaje, roles, región o fuentes. Las capas se activan en la leyenda. El linaje se abre desde un chip de agente. Ack y Assign son solo para Manager. El selector cambia El Salvador / WUI y Cascade en el mismo mapa.",
 };
-
-const SCOPE_ES =
-  "Puedo ayudarte con este incidente y con cómo usar Ops (capas, linaje, roles, región, fuentes).";
-
-const GREETING_EN =
-  "Hi — I'm here. Ask me about this incident or how to use Ops (layers, lineage, roles, region, feeds).";
-
-const GREETING_ES =
-  "Hola. Aquí estoy. Pregúntame sobre este incidente o cómo usar Ops (capas, linaje, roles, región, fuentes).";
-
-const LANGUAGE_EN =
-  "Yes. I can answer in English. What do you need on this incident or the Ops screen?";
-
-const LANGUAGE_ES =
-  "Sí, hablo español. Pregúntame sobre este incidente o cómo usar Ops (capas, linaje, roles, región, fuentes).";
 
 function has(q: string, pattern: RegExp): boolean {
   return pattern.test(q);
@@ -129,7 +121,7 @@ export function answerFaq(question: string, region: Pick<OpsRegion, "executiveSu
   const topic = classifyAskQuestion(question);
   const lang = askReplyLanguage(question);
   if (topic === "greeting") return greetingAnswer(question, lang);
-  if (topic === "scope") return lang === "es" ? SCOPE_ES : FAQ_COPY.scope;
+  if (topic === "scope") return lang === "es" ? REFUSE_ES : FAQ_COPY.scope;
   if (topic === "situation") {
     return lang === "es"
       ? `Resumen del incidente: ${region.executiveSummary}`
