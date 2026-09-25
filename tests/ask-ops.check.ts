@@ -19,7 +19,7 @@ import {
   readSpeakQuota,
   utcDay,
 } from "../src/lib/ask/limits";
-import { ASK_DEEPSEEK_MODEL, ASK_OPENAI_MODEL } from "../src/lib/ask/models";
+import { ASK_DEEPSEEK_MODEL, ASK_OPENAI_MODEL, askSystemPrompt } from "../src/lib/ask/models";
 import { handleAskSpeak } from "../src/lib/ask/speak";
 import {
   MIC_DENIED_HINT,
@@ -113,6 +113,26 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: true,
+    configured: true,
+    capped: false,
+    answer: "Sí, hablo español. Pregúntame sobre las capas.",
+  }),
+  true,
+  "a Spanish reply still auto-speaks after a voice ask",
+);
+assert.equal(
+  shouldAutoSpeak({
+    voiceOrigin: false,
+    configured: true,
+    capped: false,
+    answer: "Sí, hablo español. Pregúntame sobre las capas.",
+  }),
+  false,
+  "a typed Spanish ask must not auto-speak",
+);
 assert.equal(MIC_IDLE_LABEL, "Ask with voice");
 assert.equal(MIC_DENIED_HINT, "Mic unavailable · type instead");
 assert.equal(micAriaLabel("idle", true), "Ask with voice");
@@ -149,12 +169,74 @@ assert.doesNotMatch(opsAskUrl(workerOps), /^https?:\/\/[^/]+\/api\//);
 
 assert.equal(classifyAskQuestion("What is the capital of France?"), "scope");
 const scope = answerFaq("What is the capital of France?", sv);
-assert.match(scope, /only covers this incident/);
+assert.match(scope, /I can help with this incident/);
 assert.match(scope, /layers, lineage, roles, region, feeds/);
 assert.doesNotMatch(scope, /Paris/);
+assert.doesNotMatch(scope, /I can only assist/);
 assert.match(answerFaq("How do I toggle layers?", sv), /Hotspots/);
+assert.match(answerFaq("How do I toggle layers?", sv), /Map layers are Hotspots/);
 assert.match(answerFaq("Who can ack dispatch?", sv), /Manager-only/);
 assert.match(answerFaq("What's the situation?", sv), /El Salvador WUI watch/);
+assert.doesNotMatch(answerFaq("What's the situation?", sv), /Resumen del incidente/);
+
+assert.equal(classifyAskQuestion("hey"), "greeting");
+assert.equal(classifyAskQuestion("hola"), "greeting");
+assert.equal(classifyAskQuestion("can you speak Spanish?"), "greeting");
+assert.equal(classifyAskQuestion("¿hablas español?"), "greeting");
+assert.equal(classifyAskQuestion("¿Cuál es la capital de Francia?"), "scope");
+assert.equal(classifyAskQuestion("¿Cómo funcionan las capas?"), "layers");
+assert.equal(classifyAskQuestion("I need a house"), "scope");
+
+const hey = answerFaq("hey", sv);
+assert.match(hey, /^Hi /);
+assert.match(hey, /this incident/);
+assert.doesNotMatch(hey, /Puedo ayudarte|Hola/);
+
+const hola = answerFaq("hola", sv);
+assert.match(hola, /^Hola/);
+assert.match(hola, /incidente/);
+assert.doesNotMatch(hola, /I can help with this incident/);
+
+const speakEs = answerFaq("can you speak Spanish?", sv);
+assert.match(speakEs, /hablo español/);
+assert.doesNotMatch(speakEs, /I can only assist|Brief aloud on the exec summary/);
+
+const hablas = answerFaq("¿hablas español?", sv);
+assert.match(hablas, /hablo español/);
+
+const esScope = answerFaq("¿Cuál es la capital de Francia?", sv);
+assert.match(esScope, /Puedo ayudarte con este incidente/);
+assert.match(esScope, /capas, linaje, roles/);
+assert.doesNotMatch(esScope, /Par[ií]s/);
+assert.doesNotMatch(esScope, /I can help with this incident|I can only assist/);
+
+const capas = answerFaq("¿Cómo funcionan las capas?", sv);
+assert.match(capas, /leyenda/);
+assert.match(capas, /Hotspots/);
+assert.doesNotMatch(capas, /Map layers are Hotspots/);
+
+assert.match(answerFaq("¿cuál es la situación?", sv), /Resumen del incidente/);
+assert.match(answerFaq("¿cuál es la situación?", sv), /El Salvador WUI watch/);
+assert.equal(classifyAskQuestion("How do layers work in Spanish?"), "layers");
+assert.match(answerFaq("How do layers work in Spanish?", sv), /leyenda/);
+assert.doesNotMatch(answerFaq("How do layers work in Spanish?", sv), /Map layers are Hotspots/);
+
+const mixed =
+  "okay I need a house about those topics but I don't know sure you speak Spanish";
+assert.equal(classifyAskQuestion(mixed), "greeting");
+assert.match(answerFaq(mixed, sv), /hablo español/);
+assert.doesNotMatch(answerFaq("I need a house", sv), /bedroom|real estate|español/i);
+
+const enPrompt = askSystemPrompt("How do layers work?");
+assert.match(enPrompt, /Language lock: write the entire answer in English/);
+assert.match(enPrompt, /Ack and Assign/);
+assert.match(enPrompt, /greetings/i);
+assert.match(enPrompt, /can you speak Spanish/);
+assert.doesNotMatch(enPrompt, /refuse in one sentence and name those topics/);
+const esPrompt = askSystemPrompt("¿hablas español?");
+assert.match(esPrompt, /Language lock: write the entire answer in Spanish/);
+assert.match(esPrompt, /Never answer a Spanish question with an English refusal/);
+assert.doesNotMatch(esPrompt, /Language lock: write the entire answer in English/);
 
 assert.equal(canConsumeAsk(0), true);
 assert.equal(canConsumeAsk(9), true);
@@ -296,6 +378,8 @@ async function modelPickAndFailover() {
   assert.match(user, /GAMMA/);
   assert.doesNotMatch(user, /DELTA/);
   assert.match(system, /Ack and Assign/);
+  assert.match(system, /Language lock: write the entire answer in English/);
+  assert.match(system, /friendly teammate/);
 
   const backup = llmFetch((url) => {
     if (url.includes("openai.com")) return { status: 503 };
@@ -333,8 +417,42 @@ async function modelPickAndFailover() {
   assert.equal(bothDown.calls, 2);
   assert.equal(faqBody.sim, true);
   assert.equal(faqBody.source, "faq");
-  assert.match(String(faqBody.answer), /only covers this incident/);
+  assert.match(String(faqBody.answer), /I can help with this incident/);
   assert.doesNotMatch(String(faqBody.answer), /Paris/);
+  assert.doesNotMatch(String(faqBody.answer), /I can only assist/);
+
+  const spanishDown = llmFetch(() => ({ status: 500 }));
+  const spanishFaq = await handleAsk({
+    session: viewer,
+    question: "¿Cuál es la capital de Francia?",
+    regionId: "el-salvador",
+    env: { OPENAI_API_KEY: "sk-test", DEEPSEEK_API_KEY: "ds-test" },
+    fetch: spanishDown.fetchFn,
+  });
+  const spanishBody = await jsonBody(spanishFaq);
+  assert.equal(spanishBody.source, "faq");
+  assert.match(String(spanishBody.answer), /Puedo ayudarte con este incidente/);
+  assert.doesNotMatch(String(spanishBody.answer), /Par[ií]s|I can only assist/);
+
+  const spanishLive = llmFetch(() => ({
+    status: 200,
+    content: "Sí, hablo español. Pregúntame sobre las capas del mapa.",
+  }));
+  const spanishOk = await handleAsk({
+    session: viewer,
+    question: "¿hablas español?",
+    regionId: "el-salvador",
+    env: { OPENAI_API_KEY: "sk-test" },
+    fetch: spanishLive.fetchFn,
+  });
+  const spanishOkBody = await jsonBody(spanishOk);
+  assert.equal(spanishOkBody.source, "openai");
+  assert.equal(spanishLive.calls, 1);
+  assert.match(String(spanishOkBody.answer), /español/);
+  assert.match(
+    spanishLive.captured[0]!.body.messages?.[0]?.content ?? "",
+    /Language lock: write the entire answer in Spanish/,
+  );
 }
 
 async function askSessionCap() {
@@ -483,6 +601,8 @@ function uiWiring() {
 
   const drawer = readFileSync("src/components/ops/AskOpsDrawer.tsx", "utf8");
   assert.match(drawer, /Speak answer/);
+  assert.match(drawer, /autoSpeakRef\.current = answer/);
+  assert.match(drawer, /voiceOrigin/);
   assert.match(drawer, /Speaking…/);
   assert.match(drawer, /ask-speak-pulse/);
   assert.match(drawer, /#22D3EE/);
