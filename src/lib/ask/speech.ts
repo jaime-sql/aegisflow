@@ -7,6 +7,41 @@ export const MIC_IDLE_LABEL = "Ask with voice";
 /** Denied or unsupported. Tooltip copy, not a toast. */
 export const MIC_DENIED_HINT = "Mic unavailable · type instead";
 
+/** Ask drawer recognition locale. Demo default is Spanish. */
+export type MicLocale = "es" | "en";
+
+export const DEFAULT_MIC_LOCALE: MicLocale = "es";
+/** El Salvador Spanish for this demo. */
+export const MIC_LANG_ES = "es-SV";
+/** Used when the browser rejects es-SV. */
+export const MIC_LANG_ES_FALLBACK = "es-ES";
+export const MIC_LANG_EN = "en-US";
+
+export function parseMicLocale(raw: string | null | undefined): MicLocale {
+  return raw === "en" ? "en" : DEFAULT_MIC_LOCALE;
+}
+
+/** BCP-47 tag passed to SpeechRecognition.lang. */
+export function micRecognitionLang(locale: MicLocale, esFallback = false): string {
+  if (locale === "en") return MIC_LANG_EN;
+  return esFallback ? MIC_LANG_ES_FALLBACK : MIC_LANG_ES;
+}
+
+/**
+ * es-SV is the Spanish tag. If the browser reports language-not-supported,
+ * retry once with es-ES. Other errors stay on the current tag.
+ */
+export function micLangAfterError(
+  locale: MicLocale,
+  esFallback: boolean,
+  errorCode: string,
+): { esFallback: boolean; retry: boolean } {
+  if (locale === "es" && !esFallback && errorCode === "language-not-supported") {
+    return { esFallback: true, retry: true };
+  }
+  return { esFallback, retry: false };
+}
+
 export type MicPhase = "idle" | "listening" | "error";
 
 export type SpeechAlternativeLike = { transcript?: string };

@@ -106,7 +106,14 @@ export function classifyAskQuestion(question: string): FaqTopic {
   ) {
     return "situation";
   }
-  if (has(q, /\bhelp\b|\bayuda\b|\bhow do i\b|\bhow to\b|\buse ops\b|\bc[oó]mo uso\b/)) return "help";
+  if (
+    has(
+      q,
+      /\bhelp\b|\bayuda\b|\bhow do i\b|\bhow to\b|\buse ops\b|\bc[oó]mo uso\b|\bexplic\w*|\bc[oó]mo funciona\w*|\bfunciona\w*/,
+    )
+  ) {
+    return "help";
+  }
   if (isShortGreeting(q)) return "greeting";
   return "scope";
 }

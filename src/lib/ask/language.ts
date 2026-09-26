@@ -1,12 +1,21 @@
 /**
  * Ask language for the live prompt and the SIM FAQ.
  * Spanish is detected with a small signal list. Other asks stay English.
+ * A leading hey / hi / ok does not lock the line to English when a Spanish
+ * token is present (`necesito`, `explica`, `cómo`/`como`, `hola`, `funciona`, `que`, …).
  */
 
 export type AskReplyLanguage = "en" | "es";
 
 const SPANISH_SIGNAL =
-  /[áéíóúüñ¿¡]|\b(hola|gracias|por favor|buenos|buenas|d[ií]as|tardes|noches|c[oó]mo|qu[eé]|cu[aá]l|puedes|puede|puedo|hablo|hablas|habla|hablar|espa[nñ]ol|espanol|capas?|linaje|despacho|situaci[oó]n|ayuda|ayudarte|necesito|necesitas|quisiera|viento|leyenda|fuentes?|incendio|d[oó]nde|tambi[eé]n|agentes?|propagaci[oó]n|evacuaci[oó]n|aqu[ií]|estoy|claro)\b/i;
+  /[áéíóúüñ¿¡]|\b(hola|gracias|por favor|buenos|buenas|d[ií]as|tardes|noches|c[oó]mo|qu[eé]|cu[aá]l|puedes|puede|puedo|hablo|hablas|habla|hablar|espa[nñ]ol|espanol|capas?|linaje|despacho|situaci[oó]n|ayuda|ayudarte|necesito|necesitas|quisiera|viento|leyenda|fuentes?|incendio|d[oó]nde|tambi[eé]n|agentes?|propagaci[oó]n|evacuaci[oó]n|aqu[ií]|estoy|claro|explica\w*|funciona\w*)\b/i;
+
+/**
+ * Bare "me" is a Spanish clitic in lines like "que me expliques".
+ * It does not flip a typed English sentence ("tell me how layers work").
+ */
+const ENGLISH_LINE =
+  /\b(the|how|what|where|when|why|who|show|tell|about|layers?|works?|working|please|capital|france|house|dispatch|lineage|incident|toggle|ack|assign|feeds?|wind|hotspots?|situation|summary|can|you|do(?:es)?|this|that|with|your|from|have|need|only|help)\b/i;
 
 export function textLooksSpanish(text: string): boolean {
   return SPANISH_SIGNAL.test(text);
@@ -33,9 +42,15 @@ function asksInSpanish(question: string): boolean {
   return /\b(in spanish|en espa[nñ]ol|en espanol)\b/i.test(question);
 }
 
+function bareMeMarksSpanish(question: string): boolean {
+  if (!/\bme\b/i.test(question)) return false;
+  return !ENGLISH_LINE.test(question);
+}
+
 /**
  * Language the reply should use.
  * A request to speak Spanish locks Spanish even when the ask is in English.
+ * Any clear Spanish token locks Spanish even when the line starts with hey.
  */
 export function askReplyLanguage(question: string): AskReplyLanguage {
   if (isLanguageMeta(question)) {
@@ -44,7 +59,9 @@ export function askReplyLanguage(question: string): AskReplyLanguage {
     if (es && !en) return "es";
     if (en && !es) return "en";
   }
-  if (asksInSpanish(question) || SPANISH_SIGNAL.test(question)) return "es";
+  if (asksInSpanish(question) || SPANISH_SIGNAL.test(question) || bareMeMarksSpanish(question)) {
+    return "es";
+  }
   return "en";
 }
 
@@ -82,10 +99,15 @@ export function normalizeAskText(question: string): string {
     .trim();
 }
 
+/** Content after an English opener means this is an ask, not a greeting. */
+const SPANISH_ASK_CONTENT =
+  /\b(necesito|necesitas|explica\w*|expl[ií]c\w*|funciona\w*|capas?|linaje|ayuda|ayudarte|viento|leyenda|incendio|despacho|situaci[oó]n|d[oó]nde|cu[aá]l)\b/i;
+
 /** Short greetings only. An Ops keyword later in classify wins over this. */
 export function isShortGreeting(question: string): boolean {
   const trimmed = normalizeAskText(question);
   if (!trimmed || trimmed.length > 48) return false;
+  if (SPANISH_ASK_CONTENT.test(trimmed)) return false;
   if (GREETING_EXACT.has(trimmed)) return true;
   const words = trimmed.split(" ");
   if (words.length > 4) return false;
