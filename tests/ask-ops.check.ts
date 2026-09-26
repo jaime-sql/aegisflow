@@ -34,8 +34,12 @@ import { handleAskSpeak } from "../src/lib/ask/speak";
 import {
   MIC_DENIED_HINT,
   MIC_IDLE_LABEL,
+  MIC_LOCALE_TITLE_EN,
+  MIC_LOCALE_TITLE_ES,
   micAriaLabel,
   micLangAfterError,
+  micLocaleSwitch,
+  micLocaleTitle,
   micRecognitionLang,
   shouldAutoSpeak,
   speechRecognitionCtor,
@@ -237,6 +241,14 @@ assert.equal(
   ),
   mixedEs,
 );
+assert.equal(micLocaleTitle("es"), MIC_LOCALE_TITLE_ES);
+assert.equal(micLocaleTitle("en"), MIC_LOCALE_TITLE_EN);
+assert.equal(MIC_LOCALE_TITLE_ES, "Idioma del micrófono");
+assert.equal(MIC_LOCALE_TITLE_EN, "Mic language");
+assert.equal(micLocaleSwitch("es", "es", true), "noop");
+assert.equal(micLocaleSwitch("es", "en", false), "set");
+assert.equal(micLocaleSwitch("es", "en", true), "restart");
+assert.equal(micLocaleSwitch("en", "es", true), "restart");
 assert.equal(micRecognitionLang("es"), "es-SV");
 assert.equal(micRecognitionLang("es", true), "es-ES");
 assert.equal(micRecognitionLang("en"), "en-US");
@@ -729,19 +741,23 @@ function uiWiring() {
   assert.match(drawer, /speechRecognitionCtor/);
   assert.match(drawer, /interimResults = true/);
   const form = drawer.slice(drawer.indexOf("<form"));
+  const localeAt = form.indexOf("h-[22px]");
   const micAt = form.indexOf("onClick={onMic}");
-  const localeAt = form.indexOf('aria-label="Mic language"');
   const inputAt = form.indexOf('aria-label="Ask Ops"');
   const askSubmitAt = form.indexOf('type="submit"');
   assert.ok(
-    micAt > 0 && localeAt > micAt && inputAt > localeAt && askSubmitAt > inputAt,
-    "Composer is Mic, then locale, then text field, then Ask",
+    localeAt > 0 && micAt > localeAt && inputAt > micAt && askSubmitAt > inputAt,
+    "Composer is ES|EN, then Mic, then text field, then Ask",
   );
+  assert.match(form, /text-\[#64748B\]/);
+  assert.match(form, /bg-\[#1E2A40\] text-\[#E2E8F0\]/);
+  assert.match(form, /micLocaleTitle/);
+  assert.match(drawer, /micLocaleSwitch/);
   assert.match(drawer, /micRecognitionLang/);
-  assert.match(drawer, /Spanish recognition/);
-  assert.match(drawer, /English recognition/);
   assert.match(drawer, /saveMicLocale/);
   assert.doesNotMatch(drawer, /navigator\.language/);
+  assert.doesNotMatch(drawer, /globe|🌐/);
+  assert.doesNotMatch(drawer, /Spanish recognition|English recognition/);
   assert.doesNotMatch(drawer, /canDispatch/);
   assert.doesNotMatch(drawer, /toast|window\.alert|alert\(/);
   assert.doesNotMatch(drawer, /convai|\/v1\/agents|how can I help/i);
@@ -758,6 +774,8 @@ function uiWiring() {
   assert.match(speech, /Mic unavailable · type instead/);
   assert.match(speech, /es-SV/);
   assert.match(speech, /es-ES/);
+  assert.match(speech, /Idioma del micrófono/);
+  assert.match(speech, /Mic language/);
   assert.doesNotMatch(speech, /elevenlabs|convai|\/v1\/agents/i);
 
   const css = readFileSync("src/app/globals.css", "utf8");
@@ -791,6 +809,11 @@ function uiWiring() {
   assert.match(docs, /es-ES/);
   assert.match(docs, /hey necesito/);
   assert.match(docs, /localStorage/);
+  assert.match(docs, /\[ES\|EN\]/);
+  assert.match(docs, /#64748B/);
+  assert.match(docs, /#1E2A40/);
+  assert.match(docs, /#E2E8F0/);
+  assert.match(docs, /Idioma del micrófono/);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/ask-ops\.check\.ts/);

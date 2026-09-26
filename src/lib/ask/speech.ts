@@ -17,6 +17,28 @@ export const MIC_LANG_ES = "es-SV";
 export const MIC_LANG_ES_FALLBACK = "es-ES";
 export const MIC_LANG_EN = "en-US";
 
+/** Tooltip while the ES chip is active. */
+export const MIC_LOCALE_TITLE_ES = "Idioma del micrófono";
+/** Tooltip while the EN chip is active. */
+export const MIC_LOCALE_TITLE_EN = "Mic language";
+
+export function micLocaleTitle(locale: MicLocale): string {
+  return locale === "es" ? MIC_LOCALE_TITLE_ES : MIC_LOCALE_TITLE_EN;
+}
+
+/**
+ * Same chip is a no-op. A change while listening stops STT and restarts
+ * in the new locale. A change while idle only stores the preference.
+ */
+export function micLocaleSwitch(
+  current: MicLocale,
+  next: MicLocale,
+  listening: boolean,
+): "noop" | "set" | "restart" {
+  if (next === current) return "noop";
+  return listening ? "restart" : "set";
+}
+
 export function parseMicLocale(raw: string | null | undefined): MicLocale {
   return raw === "en" ? "en" : DEFAULT_MIC_LOCALE;
 }
