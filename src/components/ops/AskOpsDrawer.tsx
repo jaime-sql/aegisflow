@@ -591,7 +591,7 @@ export function AskOpsDrawer({
             return (
               <div key={turn.id} className={turn.role === "user" ? "text-right" : ""}>
                 <p
-                  className={`inline-block max-w-full rounded px-2 py-1.5 text-left text-[12px] leading-relaxed ${
+                  className={`inline-block max-w-full whitespace-pre-wrap rounded px-2 py-1.5 text-left text-[12px] leading-relaxed ${
                     turn.role === "user"
                       ? "bg-[#0B1220] text-[#E8EEF9]"
                       : "text-[#E8EEF9]"

@@ -292,8 +292,10 @@ assert.match(capas, /leyenda/);
 assert.match(capas, /Hotspots/);
 assert.doesNotMatch(capas, /Map layers are Hotspots/);
 
-assert.match(answerFaq("¿cuál es la situación?", sv), /Resumen del incidente/);
-assert.match(answerFaq("¿cuál es la situación?", sv), /El Salvador WUI watch/);
+const situacionEs = answerFaq("¿cuál es la situación?", sv);
+assert.equal(situacionEs.split("\n\n").length, 4);
+assert.match(situacionEs, /Vigilancia: El Salvador \/ WUI/);
+assert.doesNotMatch(situacionEs, /Resumen del incidente|I can only assist/);
 assert.equal(classifyAskQuestion("How do layers work in Spanish?"), "layers");
 assert.match(answerFaq("How do layers work in Spanish?", sv), /leyenda/);
 assert.doesNotMatch(answerFaq("How do layers work in Spanish?", sv), /Map layers are Hotspots/);
@@ -336,55 +338,84 @@ assert.equal(classifyAskQuestion("how does this work"), "help");
 assert.equal(classifyAskQuestion("explain this"), "help");
 assert.equal(classifyAskQuestion("¿Cómo funcionan las capas?"), "layers");
 
+function situationBeats(text: string): string[] {
+  return text.split("\n\n");
+}
+
+function howtoBullets(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "));
+}
+
 const pasando = answerFaq("explicame que esta pasando", sv, grounding);
-assert.match(pasando, /Te cuento lo que está pasando/);
-assert.match(pasando, /Resumen del incidente/);
-assert.match(pasando, /El Salvador WUI watch/);
-assert.match(pasando, /FIRMS · 4m ago · DEMO FIXTURE/);
-assert.match(pasando, /Wind · fallback/);
-assert.match(pasando, /cono Predicted está en el mapa/);
-assert.match(pasando, /SIM, no es satélite/);
-assert.match(pasando, /Agentes: ALPHA/);
-assert.match(pasando, /GAMMA/);
+const pasandoBeats = situationBeats(pasando);
+assert.equal(pasandoBeats.length, 4);
+assert.ok(pasandoBeats.every((beat) => beat.trim().length > 0 && !beat.includes("\n")));
+assert.match(pasandoBeats[0]!, /Vigilancia: El Salvador \/ WUI/);
+assert.match(pasandoBeats[1]!, /FIRMS · 4m ago · DEMO FIXTURE/);
+assert.match(pasandoBeats[1]!, /Wind · fallback/);
+assert.match(pasandoBeats[2]!, /El cono Predicted está en el mapa, SIM, no es satélite/);
+assert.match(pasandoBeats[3]!, /Agentes: ALPHA, BETA, GAMMA/);
 assert.doesNotMatch(pasando, /DELTA/);
 assert.doesNotMatch(pasando, /Puedo ayudarte con este incidente|I can only assist|Please ask about|Map layers are Hotspots/);
+assert.ok(pasando.replace(/\s+/g, " ").trim().split(" ").length <= 40);
+
+const quePasa = answerFaq("¿qué está pasando?", sv, grounding);
+assert.equal(situationBeats(quePasa).length, 4);
+assert.match(quePasa, /Vigilancia:/);
+assert.doesNotMatch(quePasa, /Here's what is happening|I can help with this incident/);
 
 const como = answerFaq("como funciona esto", sv, grounding);
-assert.match(como, /Así funciona esto en El Salvador \/ WUI/);
+const comoBullets = howtoBullets(como);
+assert.ok(comoBullets.length >= 3 && comoBullets.length <= 4);
+assert.equal(como.split("\n").filter((line) => line.trim()).length, comoBullets.length);
+assert.match(como, /capas/);
 assert.match(como, /leyenda/);
-assert.match(como, /linaje/i);
+assert.match(como, /linaje/);
 assert.match(como, /Ack y Assign son solo para Manager/);
-assert.match(como, /Región·fuentes/);
-assert.match(como, /DEMO FIXTURE/);
 assert.doesNotMatch(como, /Puedo ayudarte con este incidente|I can only assist|Map layers are Hotspots|Here's how this works/);
 
+const explicaComo = answerFaq("explicame como funciona", sv, grounding);
+assert.ok(howtoBullets(explicaComo).length <= 4);
+assert.match(explicaComo, /capas/);
+assert.match(explicaComo, /leyenda/);
+
 const holaComo = answerFaq("hola necesito que me explicas como funciona esto", sv, grounding);
-assert.match(holaComo, /Así funciona esto/);
+assert.ok(howtoBullets(holaComo).length <= 4);
 assert.match(holaComo, /leyenda/);
 assert.doesNotMatch(holaComo, /Puedo ayudarte con este incidente|I can help with this incident/);
 
 const heyEs = answerFaq("hey necesito que me expliques", sv);
-assert.match(heyEs, /Así funciona esto/);
+assert.ok(howtoBullets(heyEs).length <= 4);
+assert.match(heyEs, /capas/);
 assert.doesNotMatch(heyEs, /I can help with this incident|Hi — I'm here/);
 
 const goingOn = answerFaq("what's going on", sv, grounding);
-assert.match(goingOn, /Here's what is happening on El Salvador \/ WUI/);
-assert.match(goingOn, /El Salvador WUI watch/);
-assert.match(goingOn, /DEMO FIXTURE/);
-assert.match(goingOn, /Wind · fallback/);
-assert.doesNotMatch(goingOn, /Resumen del incidente|Te cuento|Así funciona|Puedo ayudarte/);
+const goingBeats = situationBeats(goingOn);
+assert.equal(goingBeats.length, 4);
+assert.match(goingBeats[0]!, /El Salvador WUI watch/);
+assert.match(goingBeats[1]!, /DEMO FIXTURE/);
+assert.match(goingBeats[1]!, /Wind · fallback/);
+assert.match(goingBeats[2]!, /Predicted cone is on the map, SIM/);
+assert.match(goingBeats[3]!, /Agents: ALPHA, BETA, GAMMA/);
+assert.doesNotMatch(goingOn, /Resumen del incidente|Vigilancia|Así funciona|Puedo ayudarte/);
 
 const howEn = answerFaq("how does this work", sv, grounding);
-assert.match(howEn, /Here's how this works on El Salvador \/ WUI/);
-assert.match(howEn, /legend toggles/);
-assert.match(howEn, /Region·feeds/);
-assert.match(howEn, /DEMO FIXTURE/);
-assert.doesNotMatch(howEn, /Así funciona|leyenda|Resumen del incidente/);
+const howBullets = howtoBullets(howEn);
+assert.ok(howBullets.length >= 3 && howBullets.length <= 4);
+assert.match(howEn, /Layers:/);
+assert.match(howEn, /legend/);
+assert.match(howEn, /Rail:/);
+assert.match(howEn, /Dispatch:/);
+assert.doesNotMatch(howEn, /Así funciona|leyenda|Vigilancia|capas/);
 
 const explainEn = answerFaq("explain this", sv);
-assert.match(explainEn, /Here's how this works/);
-assert.match(explainEn, /Lineage/);
-assert.doesNotMatch(explainEn, /Así funciona|leyenda/);
+assert.ok(howtoBullets(explainEn).length <= 4);
+assert.match(explainEn, /Layers:/);
+assert.match(explainEn, /Dispatch:/);
+assert.doesNotMatch(explainEn, /Así funciona|leyenda|capas/);
 
 const fixtureFacts = askBriefFactsFromIncident(cloneFixtureIncident());
 assert.equal(fixtureFacts.firmsHonesty, "DEMO FIXTURE");
@@ -705,11 +736,11 @@ async function situationBriefSkipsModel() {
   assert.equal(situationBody.ok, true);
   assert.equal(situationBody.sim, true);
   assert.equal(situationBody.source, "faq");
-  assert.match(String(situationBody.answer), /Te cuento lo que está pasando/);
+  assert.equal(String(situationBody.answer).split("\n\n").length, 4);
+  assert.match(String(situationBody.answer), /Vigilancia: El Salvador \/ WUI/);
   assert.match(String(situationBody.answer), /FIRMS · 4m ago · DEMO FIXTURE/);
   assert.match(String(situationBody.answer), /Wind · fallback/);
-  assert.match(String(situationBody.answer), /ALPHA/);
-  assert.match(String(situationBody.answer), /El Salvador WUI watch/);
+  assert.match(String(situationBody.answer), /Agentes: ALPHA, BETA, GAMMA/);
   assert.doesNotMatch(
     String(situationBody.answer),
     /Puedo ayudarte con este incidente|I can only assist|Please ask about/,
@@ -727,9 +758,13 @@ async function situationBriefSkipsModel() {
   });
   const howtoBody = await jsonBody(howto);
   assert.equal(calls, 0);
-  assert.match(String(howtoBody.answer), /Así funciona esto/);
+  const howtoLines = String(howtoBody.answer)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "));
+  assert.ok(howtoLines.length >= 3 && howtoLines.length <= 4);
   assert.match(String(howtoBody.answer), /leyenda/);
-  assert.match(String(howtoBody.answer), /DEMO FIXTURE/);
+  assert.match(String(howtoBody.answer), /capas/);
   assert.doesNotMatch(String(howtoBody.answer), /Map layers are Hotspots|I can help with this incident/);
 
   const english = await handleAsk({
@@ -741,9 +776,10 @@ async function situationBriefSkipsModel() {
     fetch: fetchFn,
   });
   const englishBody = await jsonBody(english);
-  assert.match(String(englishBody.answer), /Here's what is happening/);
+  assert.equal(String(englishBody.answer).split("\n\n").length, 4);
+  assert.match(String(englishBody.answer), /El Salvador WUI watch/);
   assert.match(String(englishBody.answer), /DEMO FIXTURE/);
-  assert.doesNotMatch(String(englishBody.answer), /Resumen del incidente|Te cuento/);
+  assert.doesNotMatch(String(englishBody.answer), /Vigilancia|Resumen del incidente/);
 
   const explain = await handleAsk({
     session: viewer,
@@ -753,8 +789,9 @@ async function situationBriefSkipsModel() {
     fetch: fetchFn,
   });
   const explainBody = await jsonBody(explain);
-  assert.match(String(explainBody.answer), /Here's how this works on Cascade/);
-  assert.doesNotMatch(String(explainBody.answer), /Así funciona|leyenda/);
+  assert.match(String(explainBody.answer), /Layers:/);
+  assert.match(String(explainBody.answer), /Dispatch:/);
+  assert.doesNotMatch(String(explainBody.answer), /Así funciona|leyenda|capas/);
   assert.equal(calls, 0);
 
   const grounded = llmFetch(() => ({ status: 200, content: "Toggle the legend." }));

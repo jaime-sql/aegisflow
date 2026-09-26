@@ -12,11 +12,20 @@ import { clampAgentLines } from "./help";
 /** Aim under ~1–2k tokens. The serialized brief is capped well below that. */
 export const ASK_BRIEF_MAX_CHARS = 2200;
 
-export const ASK_HOWTO_EN =
-  "Layers: legend toggles for Hotspots, Wind, Agents, and Predicted (the agent spread cone, not a satellite layer). Lineage: open an agent chip, then View lineage — same hotspot and wind eventIds as the map. Roles: Manager and Viewer can Ask; Ack and Assign stay Manager-only. Region·feeds: the picker switches El Salvador / WUI and Cascade on this map; feeds are FIRMS, WeatherNext wind, and crowdsource (RF and Edge stay SIM).";
+/** How-it-works reply: at most four bullets (layers, rail, Ask, dispatch). */
+export const ASK_HOWTO_EN = [
+  "- Layers: toggle Hotspots, Wind, Agents, and Predicted on the legend.",
+  "- Rail: open an agent chip, then View lineage.",
+  "- Ask: Manager and Viewer can both ask.",
+  "- Dispatch: Ack and Assign stay Manager-only.",
+].join("\n");
 
-export const ASK_HOWTO_ES =
-  "Las capas se activan en la leyenda (Hotspots, Wind, Agents y Predicted, el cono del agente, no una capa satelital). El linaje se abre desde un chip de agente y luego View lineage; cita los mismos eventIds del mapa. Roles: Manager y Viewer pueden usar Ask; Ack y Assign son solo para Manager. Región·fuentes: el selector cambia El Salvador / WUI y Cascade en este mapa; las fuentes son FIRMS, viento WeatherNext y crowdsource (RF y Edge siguen en SIM).";
+export const ASK_HOWTO_ES = [
+  "- Las capas se activan en la leyenda: Hotspots, Wind, Agents y Predicted.",
+  "- Panel: el linaje se abre desde un chip de agente.",
+  "- Ask: Manager y Viewer pueden preguntar.",
+  "- Despacho: Ack y Assign son solo para Manager.",
+].join("\n");
 
 export type AskFirmsHonesty = typeof FIRMS_LIVE_LABEL | typeof FIRMS_DEMO_STATUS;
 export type AskWindHonesty = "LIVE" | "fallback" | "offline";
@@ -162,69 +171,65 @@ export function formatAskBrief(brief: AskBrief): string {
   return `${text.slice(0, ASK_BRIEF_MAX_CHARS).replace(/\s+\S*$/, "").trim()}…`;
 }
 
-function predictedSentence(brief: AskBrief, lang: "en" | "es"): string | null {
-  if (!brief.predictedLine) return null;
-  const absent = brief.predictedLine.includes("not drawn");
-  const sim = brief.predictedLine.includes("SIM");
-  if (lang === "es") {
-    if (absent) return "El cono Predicted no está dibujado en este turno.";
-    return sim
-      ? "El cono Predicted está en el mapa (SIM, no es satélite)."
-      : "El cono Predicted está en el mapa (sobre del agente, no es satélite).";
-  }
-  if (absent) return "Predicted cone is not drawn this turn.";
-  return sim
-    ? "Predicted cone is on the map (SIM, not a satellite layer)."
-    : "Predicted cone is on the map (agent envelope, not a satellite layer).";
+function watchBeat(brief: AskBrief, lang: "en" | "es"): string {
+  if (lang === "es") return `Vigilancia: ${brief.regionLabel}.`;
+  const first = brief.executiveSummary.split(/[.!?]/)[0]?.trim() || brief.incidentName;
+  const short = first.length > 72 ? brief.incidentName : first;
+  return `${short}.`;
 }
 
-function honestySentences(brief: AskBrief, lang: "en" | "es"): string[] {
-  const lines: string[] = [];
-  if (brief.firmsLine) {
-    lines.push(lang === "es" ? `Hotspots: ${brief.firmsLine}.` : `${brief.firmsLine}.`);
+/** One honesty line. Product tokens stay literal when they are true. */
+function honestyBeat(brief: AskBrief, lang: "en" | "es"): string {
+  const parts = [brief.firmsLine, brief.windLine].filter((line): line is string => Boolean(line));
+  if (parts.length === 0) {
+    return lang === "es" ? "Fuentes sin reporte de honestidad." : "Feed honesty not reported.";
   }
-  if (brief.windLine) {
-    lines.push(lang === "es" ? `Viento: ${brief.windLine}.` : `${brief.windLine}.`);
-  }
-  const predicted = predictedSentence(brief, lang);
-  if (predicted) lines.push(predicted);
-  return lines;
+  return `${parts.join(". ")}.`;
 }
 
-/** Friendly situation reply. Spanish keeps the locked "Resumen del incidente" lead-in. */
-export function situationReply(brief: AskBrief, lang: "en" | "es"): string {
-  const honesty = honestySentences(brief, lang);
-  const agents =
-    brief.agents.length === 0
-      ? ""
-      : lang === "es"
-        ? `Agentes: ${brief.agents.join(" ")}`
-        : `Agents: ${brief.agents.join(" ")}`;
-  if (lang === "es") {
-    return [
-      `Te cuento lo que está pasando en ${brief.regionLabel}.`,
-      ...honesty,
-      `Resumen del incidente: ${brief.executiveSummary}`,
-      agents,
-    ]
-      .filter(Boolean)
-      .join(" ");
+function predictedBeat(brief: AskBrief, lang: "en" | "es"): string {
+  if (!brief.predictedLine) {
+    return lang === "es"
+      ? "El cono Predicted no viene en este turno."
+      : "Predicted cone is not reported this turn.";
   }
-  return [
-    `Here's what is happening on ${brief.regionLabel}.`,
-    ...honesty,
-    brief.executiveSummary,
-    agents,
-  ]
+  if (brief.predictedLine.includes("not drawn")) {
+    return lang === "es"
+      ? "El cono Predicted no está en el mapa."
+      : "Predicted cone is not drawn this turn.";
+  }
+  if (brief.predictedLine.includes("SIM")) {
+    return lang === "es"
+      ? "El cono Predicted está en el mapa, SIM, no es satélite."
+      : "Predicted cone is on the map, SIM, not a satellite layer.";
+  }
+  return lang === "es"
+    ? "El cono Predicted está en el mapa, no es satélite."
+    : "Predicted cone is on the map, not a satellite layer.";
+}
+
+function agentBeat(brief: AskBrief, lang: "en" | "es"): string {
+  const names = brief.agents
+    .map((line) => line.split(":")[0]?.trim() || "")
     .filter(Boolean)
-    .join(" ");
+    .slice(0, 3);
+  if (names.length === 0) {
+    return lang === "es" ? "Agentes: ninguno en este turno." : "Agents: none on this turn.";
+  }
+  return lang === "es" ? `Agentes: ${names.join(", ")}.` : `Agents: ${names.join(", ")}.`;
 }
 
-/** Ops how-to in the ask language, plus the live honesty lines when we have them. */
+/**
+ * Situation reply: exactly four short beats, blank line between them.
+ * Watch, honesty, Predicted, agents. Speak-length, not a paragraph.
+ */
+export function situationReply(brief: AskBrief, lang: "en" | "es"): string {
+  return [watchBeat(brief, lang), honestyBeat(brief, lang), predictedBeat(brief, lang), agentBeat(brief, lang)].join(
+    "\n\n",
+  );
+}
+
+/** How-it-works: the language's bullet list only (3–4 lines). */
 export function howtoReply(brief: AskBrief, lang: "en" | "es"): string {
-  const honesty = honestySentences(brief, lang);
-  if (lang === "es") {
-    return [`Así funciona esto en ${brief.regionLabel}.`, brief.howtoEs, ...honesty].join(" ");
-  }
-  return [`Here's how this works on ${brief.regionLabel}.`, brief.howtoEn, ...honesty].join(" ");
+  return lang === "es" ? brief.howtoEs : brief.howtoEn;
 }
