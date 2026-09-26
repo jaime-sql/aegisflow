@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { IncidentEvent } from "@/lib/schema";
 import { opsAskSpeakUrl, opsAskUrl } from "@/lib/base-path";
+import { askBriefFactsFromIncident } from "@/lib/ask/brief";
 import { ASK_QUESTION_MAX } from "@/lib/ask/help";
 import {
   ASK_LIMIT_HINT,
@@ -69,7 +70,10 @@ export function AskOpsDrawer({
   onClose,
 }: {
   open: boolean;
-  incident: Pick<IncidentEvent, "name" | "region" | "agents">;
+  incident: Pick<
+    IncidentEvent,
+    "name" | "region" | "agents" | "hotspots" | "wind" | "feedHealth"
+  >;
   configured: boolean;
   onClose: () => void;
 }) {
@@ -350,6 +354,7 @@ export function AskOpsDrawer({
             title: agent.title,
             summary: agent.summary,
           })),
+          brief: askBriefFactsFromIncident(incident),
         }),
       });
       const data = (await res.json()) as AskPayload;
@@ -586,7 +591,7 @@ export function AskOpsDrawer({
             return (
               <div key={turn.id} className={turn.role === "user" ? "text-right" : ""}>
                 <p
-                  className={`inline-block max-w-full rounded px-2 py-1.5 text-left text-[12px] leading-relaxed ${
+                  className={`inline-block max-w-full whitespace-pre-wrap rounded px-2 py-1.5 text-left text-[12px] leading-relaxed ${
                     turn.role === "user"
                       ? "bg-[#0B1220] text-[#E8EEF9]"
                       : "text-[#E8EEF9]"
