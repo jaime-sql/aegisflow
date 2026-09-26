@@ -20,14 +20,27 @@ import {
   utcDay,
   type SpeakQuota,
 } from "@/lib/ask/limits";
-import { loadAskCount, loadSpeakQuota, saveAskCount, saveSpeakQuota } from "@/lib/ask/storage";
 import {
+  loadAskCount,
+  loadMicLocale,
+  loadSpeakQuota,
+  saveAskCount,
+  saveMicLocale,
+  saveSpeakQuota,
+} from "@/lib/ask/storage";
+import {
+  DEFAULT_MIC_LOCALE,
   MIC_DENIED_HINT,
   micAriaLabel,
+  micLangAfterError,
+  micLocaleSwitch,
+  micLocaleTitle,
+  micRecognitionLang,
   shouldAutoSpeak,
   speechRecognitionCtor,
   transcriptFromResults,
   type BrowserSpeechRecognition,
+  type MicLocale,
   type MicPhase,
 } from "@/lib/ask/speech";
 import { SimBadge } from "./SimBadge";
@@ -71,6 +84,7 @@ export function AskOpsDrawer({
   );
   const [micPhase, setMicPhase] = useState<MicPhase>("idle");
   const [micSupported, setMicSupported] = useState(true);
+  const [micLocale, setMicLocale] = useState<MicLocale>(DEFAULT_MIC_LOCALE);
   const idRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -88,12 +102,18 @@ export function AskOpsDrawer({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const micWantedRef = useRef(false);
   const micFailedRef = useRef(false);
+  const micRetryRef = useRef(false);
+  const esSvRejectedRef = useRef(false);
+  const micLocaleRef = useRef<MicLocale>(DEFAULT_MIC_LOCALE);
+  const micPriorRef = useRef("");
+  const listenGenRef = useRef(0);
   const openRef = useRef(open);
 
   questionRef.current = question;
   speakQuotaRef.current = speakQuota;
   configuredRef.current = configured;
   openRef.current = open;
+  micLocaleRef.current = micLocale;
 
   function stopPlayback() {
     abortRef.current?.abort();
@@ -131,6 +151,9 @@ export function AskOpsDrawer({
 
   useEffect(() => {
     setMicSupported(speechRecognitionCtor(window) !== null);
+    const stored = loadMicLocale();
+    micLocaleRef.current = stored;
+    setMicLocale(stored);
   }, []);
 
   useEffect(() => {
@@ -385,55 +408,60 @@ export function AskOpsDrawer({
     void submitRef.current(questionRef.current, voiceOrigin);
   }
 
-  function onMic() {
-    if (listening) {
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        abortMic();
-        setMicPhase("idle");
-      }
-      return;
-    }
-    if (askingRef.current || atAskLimit) return;
+  function beginListen() {
     const Ctor = speechRecognitionCtor(window);
     if (!Ctor) {
+      micWantedRef.current = false;
       setMicSupported(false);
       setMicPhase("error");
       return;
     }
 
-    abortMic();
-    stopPlayback();
-    setSpeakState(configured ? "idle" : "sim");
-
-    const prior = questionRef.current;
+    const prior = micPriorRef.current;
+    const gen = ++listenGenRef.current;
     const rec = new Ctor();
-    rec.lang = navigator.language || "en-US";
+    rec.lang = micRecognitionLang(micLocaleRef.current, esSvRejectedRef.current);
     rec.continuous = false;
     rec.interimResults = true;
     recognitionRef.current = rec;
-    micWantedRef.current = true;
-    micFailedRef.current = false;
 
-    rec.onstart = () => setMicPhase("listening");
+    rec.onstart = () => {
+      if (gen !== listenGenRef.current) return;
+      setMicPhase("listening");
+    };
     rec.onresult = (event) => {
+      if (gen !== listenGenRef.current) return;
       const text = transcriptFromResults(event.results).slice(0, ASK_QUESTION_MAX);
       questionRef.current = text;
       setQuestion(text);
     };
     rec.onerror = (event) => {
+      if (gen !== listenGenRef.current) return;
       const code = event.error ?? "";
       if (code === "aborted") return;
+      const next = micLangAfterError(micLocaleRef.current, esSvRejectedRef.current, code);
+      esSvRejectedRef.current = next.esFallback;
+      if (next.retry) {
+        micRetryRef.current = true;
+        return;
+      }
       micFailedRef.current = true;
     };
     rec.onend = () => {
-      const heard = questionRef.current.trim();
-      const wanted = micWantedRef.current;
-      const failed = micFailedRef.current;
+      if (gen !== listenGenRef.current) return;
+      const retry = micRetryRef.current;
+      micRetryRef.current = false;
       recognitionRef.current = null;
+      if (!micWantedRef.current) return;
+      if (retry) {
+        questionRef.current = prior;
+        setQuestion(prior);
+        beginListen();
+        return;
+      }
+      const heard = questionRef.current.trim();
+      const failed = micFailedRef.current;
       micWantedRef.current = false;
-      if (!wanted) return;
       if (failed || !heard) {
         questionRef.current = prior;
         setQuestion(prior);
@@ -451,6 +479,54 @@ export function AskOpsDrawer({
       abortMic();
       setMicPhase("error");
     }
+  }
+
+  function selectMicLocale(next: MicLocale) {
+    const action = micLocaleSwitch(
+      micLocaleRef.current,
+      next,
+      listening || recognitionRef.current !== null,
+    );
+    if (action === "noop") return;
+    micLocaleRef.current = next;
+    setMicLocale(next);
+    saveMicLocale(next);
+    if (next === "es") esSvRejectedRef.current = false;
+    if (action !== "restart") return;
+    abortMic();
+    micWantedRef.current = true;
+    micFailedRef.current = false;
+    micRetryRef.current = false;
+    questionRef.current = micPriorRef.current;
+    setQuestion(micPriorRef.current);
+    beginListen();
+  }
+
+  function onMic() {
+    if (listening) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        abortMic();
+        setMicPhase("idle");
+      }
+      return;
+    }
+    if (askingRef.current || atAskLimit) return;
+    if (!speechRecognitionCtor(window)) {
+      setMicSupported(false);
+      setMicPhase("error");
+      return;
+    }
+
+    abortMic();
+    stopPlayback();
+    setSpeakState(configured ? "idle" : "sim");
+
+    micPriorRef.current = questionRef.current;
+    micWantedRef.current = true;
+    micFailedRef.current = false;
+    beginListen();
   }
 
   async function onSpeak() {
@@ -586,6 +662,35 @@ export function AskOpsDrawer({
             </p>
           ) : null}
           <div className="flex items-center gap-2">
+            <div
+              role="group"
+              aria-label={micLocaleTitle(micLocale)}
+              title={micLocaleTitle(micLocale)}
+              className="inline-flex h-[22px] shrink-0 items-center"
+            >
+              {(["es", "en"] as const).map((code, index) => {
+                const active = micLocale === code;
+                return (
+                  <span key={code} className="inline-flex h-full items-center">
+                    {index === 1 ? (
+                      <span aria-hidden="true" className="font-mono text-[10px] leading-none text-[#64748B]">
+                        |
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => selectMicLocale(code)}
+                      className={`inline-flex h-[22px] items-center rounded px-1.5 font-mono text-[10px] uppercase leading-none tracking-wider ${
+                        active ? "bg-[#1E2A40] text-[#E2E8F0]" : "bg-transparent text-[#64748B]"
+                      }`}
+                    >
+                      {code}
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
             <button
               type="button"
               onClick={onMic}

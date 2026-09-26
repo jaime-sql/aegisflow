@@ -61,7 +61,7 @@ const ASK_SYSTEM_RULES = [
 export function askSystemPrompt(question: string): string {
   const directive =
     askReplyLanguage(question) === "es"
-      ? "Language lock: write the entire answer in Spanish."
+      ? "Language lock: write the entire answer in Spanish. A leading hey, hi, hello, or ok does not make this English."
       : "Language lock: write the entire answer in English.";
   return `${ASK_SYSTEM_RULES} ${directive}`;
 }

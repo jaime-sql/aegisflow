@@ -13,6 +13,7 @@ import {
   REFUSE_EN,
   REFUSE_ES,
 } from "../src/lib/ask/copy";
+import { askReplyLanguage } from "../src/lib/ask/language";
 import { presentAskAnswer } from "../src/lib/ask/present";
 import { ASK_AGENT_LINE_LIMIT, OPS_ASK_HELP } from "../src/lib/ask/help";
 import {
@@ -33,12 +34,26 @@ import { handleAskSpeak } from "../src/lib/ask/speak";
 import {
   MIC_DENIED_HINT,
   MIC_IDLE_LABEL,
+  MIC_LOCALE_TITLE_EN,
+  MIC_LOCALE_TITLE_ES,
   micAriaLabel,
+  micLangAfterError,
+  micLocaleSwitch,
+  micLocaleTitle,
+  micRecognitionLang,
   shouldAutoSpeak,
   speechRecognitionCtor,
   transcriptFromResults,
 } from "../src/lib/ask/speech";
-import { loadAskCount, saveAskCount, loadSpeakQuota, saveSpeakQuota } from "../src/lib/ask/storage";
+import {
+  MIC_LOCALE_STORAGE_KEY,
+  loadAskCount,
+  loadMicLocale,
+  saveAskCount,
+  saveMicLocale,
+  loadSpeakQuota,
+  saveSpeakQuota,
+} from "../src/lib/ask/storage";
 import { OPS_REGIONS } from "../src/lib/regions";
 import { REQUIRED_WORKER_SECRETS } from "../scripts/select-worker-secrets.mjs";
 
@@ -198,6 +213,61 @@ assert.equal(classifyAskQuestion("I need a house"), "scope");
 
 assert.equal(answerFaq("hey", sv), GREETING_EN);
 assert.equal(answerFaq("hola", sv), GREETING_ES);
+assert.equal(askReplyLanguage("hey"), "en");
+assert.equal(askReplyLanguage("How do layers work?"), "en");
+assert.equal(askReplyLanguage("tell me how layers work"), "en");
+assert.equal(askReplyLanguage("What is the capital of France?"), "en");
+assert.equal(askReplyLanguage("hey necesito que me expliques como funciona"), "es");
+assert.equal(askReplyLanguage("hey funciona"), "es");
+assert.equal(askReplyLanguage("hey explícame cómo funciona"), "es");
+assert.equal(classifyAskQuestion("hey"), "greeting");
+assert.equal(classifyAskQuestion("hey necesito que me expliques como funciona"), "help");
+assert.equal(classifyAskQuestion("hey funciona"), "help");
+const mixedEs = answerFaq("hey necesito que me expliques como funciona", sv);
+assert.match(mixedEs, /leyenda/);
+assert.match(mixedEs, /capas/);
+assert.doesNotMatch(mixedEs, /Map layers are Hotspots|I can help with this incident/);
+assert.match(answerFaq("tell me how layers work", sv), /Map layers are Hotspots/);
+assert.doesNotMatch(answerFaq("tell me how layers work", sv), /leyenda/);
+const mixedPrompt = askSystemPrompt("hey necesito que me expliques como funciona");
+assert.match(mixedPrompt, /Language lock: write the entire answer in Spanish/);
+assert.match(mixedPrompt, /leading hey/);
+assert.doesNotMatch(mixedPrompt, /Language lock: write the entire answer in English/);
+assert.equal(
+  presentAskAnswer(
+    "hey necesito que me expliques como funciona",
+    "Here is how it works in English.",
+    sv,
+  ),
+  mixedEs,
+);
+assert.equal(micLocaleTitle("es"), MIC_LOCALE_TITLE_ES);
+assert.equal(micLocaleTitle("en"), MIC_LOCALE_TITLE_EN);
+assert.equal(MIC_LOCALE_TITLE_ES, "Idioma del micrófono");
+assert.equal(MIC_LOCALE_TITLE_EN, "Mic language");
+assert.equal(micLocaleSwitch("es", "es", true), "noop");
+assert.equal(micLocaleSwitch("es", "en", false), "set");
+assert.equal(micLocaleSwitch("es", "en", true), "restart");
+assert.equal(micLocaleSwitch("en", "es", true), "restart");
+assert.equal(micRecognitionLang("es"), "es-SV");
+assert.equal(micRecognitionLang("es", true), "es-ES");
+assert.equal(micRecognitionLang("en"), "en-US");
+assert.deepEqual(micLangAfterError("es", false, "language-not-supported"), {
+  esFallback: true,
+  retry: true,
+});
+assert.deepEqual(micLangAfterError("es", true, "language-not-supported"), {
+  esFallback: true,
+  retry: false,
+});
+assert.deepEqual(micLangAfterError("en", false, "language-not-supported"), {
+  esFallback: false,
+  retry: false,
+});
+assert.deepEqual(micLangAfterError("es", false, "not-allowed"), {
+  esFallback: false,
+  retry: false,
+});
 assert.equal(answerFaq("can you speak Spanish?", sv), LANGUAGE_ES);
 assert.equal(answerFaq("¿hablas español?", sv), LANGUAGE_ES);
 assert.doesNotMatch(GREETING_EN, /layers \/ lineage/);
@@ -290,6 +360,15 @@ const speakStore = memoryStore();
 saveSpeakQuota({ day: "2026-09-21", speaks: 20, chars: 10 }, speakStore);
 assert.equal(loadSpeakQuota("2026-09-21", speakStore).speaks, 20);
 assert.equal(loadSpeakQuota("2026-09-22", speakStore).speaks, 0);
+const localeStore = memoryStore();
+assert.equal(loadMicLocale(localeStore), "es");
+assert.equal(loadMicLocale(null), "es");
+saveMicLocale("en", localeStore);
+assert.equal(loadMicLocale(localeStore), "en");
+saveMicLocale("es", localeStore);
+assert.equal(loadMicLocale(localeStore), "es");
+localeStore.setItem(MIC_LOCALE_STORAGE_KEY, "fr");
+assert.equal(loadMicLocale(localeStore), "es");
 
 type Captured = { url: string; body: { model?: string; messages?: Array<{ content?: string }> } };
 
@@ -662,13 +741,23 @@ function uiWiring() {
   assert.match(drawer, /speechRecognitionCtor/);
   assert.match(drawer, /interimResults = true/);
   const form = drawer.slice(drawer.indexOf("<form"));
+  const localeAt = form.indexOf("h-[22px]");
   const micAt = form.indexOf("onClick={onMic}");
   const inputAt = form.indexOf('aria-label="Ask Ops"');
   const askSubmitAt = form.indexOf('type="submit"');
   assert.ok(
-    micAt > 0 && inputAt > micAt && askSubmitAt > inputAt,
-    "Composer is Mic, then text field, then Ask",
+    localeAt > 0 && micAt > localeAt && inputAt > micAt && askSubmitAt > inputAt,
+    "Composer is ES|EN, then Mic, then text field, then Ask",
   );
+  assert.match(form, /text-\[#64748B\]/);
+  assert.match(form, /bg-\[#1E2A40\] text-\[#E2E8F0\]/);
+  assert.match(form, /micLocaleTitle/);
+  assert.match(drawer, /micLocaleSwitch/);
+  assert.match(drawer, /micRecognitionLang/);
+  assert.match(drawer, /saveMicLocale/);
+  assert.doesNotMatch(drawer, /navigator\.language/);
+  assert.doesNotMatch(drawer, /globe|🌐/);
+  assert.doesNotMatch(drawer, /Spanish recognition|English recognition/);
   assert.doesNotMatch(drawer, /canDispatch/);
   assert.doesNotMatch(drawer, /toast|window\.alert|alert\(/);
   assert.doesNotMatch(drawer, /convai|\/v1\/agents|how can I help/i);
@@ -683,6 +772,10 @@ function uiWiring() {
   assert.match(speech, /SpeechRecognition/);
   assert.match(speech, /Ask with voice/);
   assert.match(speech, /Mic unavailable · type instead/);
+  assert.match(speech, /es-SV/);
+  assert.match(speech, /es-ES/);
+  assert.match(speech, /Idioma del micrófono/);
+  assert.match(speech, /Mic language/);
   assert.doesNotMatch(speech, /elevenlabs|convai|\/v1\/agents/i);
 
   const css = readFileSync("src/app/globals.css", "utf8");
@@ -712,6 +805,15 @@ function uiWiring() {
   assert.match(docs, /voice-originated|voice ask/i);
   assert.match(docs, /does not auto-Speak/);
   assert.match(docs, /no ElevenLabs conversational agent/i);
+  assert.match(docs, /es-SV/);
+  assert.match(docs, /es-ES/);
+  assert.match(docs, /hey necesito/);
+  assert.match(docs, /localStorage/);
+  assert.match(docs, /\[ES\|EN\]/);
+  assert.match(docs, /#64748B/);
+  assert.match(docs, /#1E2A40/);
+  assert.match(docs, /#E2E8F0/);
+  assert.match(docs, /Idioma del micrófono/);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/ask-ops\.check\.ts/);

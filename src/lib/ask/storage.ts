@@ -5,11 +5,14 @@ import {
   emptySpeakQuota,
   type SpeakQuota,
 } from "./limits";
+import { parseMicLocale, type MicLocale } from "./speech";
 
 /** Per-tab hint mirror. The API session cookie is the credit backstop. */
 export const ASK_SESSION_STORAGE_KEY = "aegisflow.askOps.session.v1";
 /** Shared across tabs for the UTC day. */
 export const SPEAK_DAY_STORAGE_KEY = "aegisflow.askOps.speak.v1";
+/** Mic ES|EN choice. Missing or unknown values stay on Spanish. */
+export const MIC_LOCALE_STORAGE_KEY = "aegisflow.askOps.micLocale.v1";
 
 export type AskStore = {
   getItem(key: string): string | null;
@@ -78,6 +81,26 @@ export function loadSpeakQuota(day: string, store?: AskStore | null): SpeakQuota
     };
   } catch {
     return emptySpeakQuota(day);
+  }
+}
+
+export function loadMicLocale(store?: AskStore | null): MicLocale {
+  const s = store === undefined ? browserLocal() : store;
+  if (!s) return parseMicLocale(null);
+  try {
+    return parseMicLocale(s.getItem(MIC_LOCALE_STORAGE_KEY));
+  } catch {
+    return parseMicLocale(null);
+  }
+}
+
+export function saveMicLocale(locale: MicLocale, store?: AskStore | null): void {
+  const s = store === undefined ? browserLocal() : store;
+  if (!s) return;
+  try {
+    s.setItem(MIC_LOCALE_STORAGE_KEY, locale === "en" ? "en" : "es");
+  } catch {
+    // Typing still works if storage is blocked. Next visit defaults to ES.
   }
 }
 
