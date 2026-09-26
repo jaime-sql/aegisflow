@@ -15,6 +15,7 @@ async function handle(request: Request): Promise<Response> {
       question?: unknown;
       regionId?: unknown;
       agents?: unknown;
+      brief?: unknown;
     } = {};
     try {
       body = (await request.json()) as typeof body;
@@ -26,6 +27,7 @@ async function handle(request: Request): Promise<Response> {
       question: body.question,
       regionId: body.regionId,
       agents: body.agents,
+      brief: body.brief,
       cookie: request.headers.get("cookie"),
     });
   } catch (err) {

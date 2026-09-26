@@ -1,4 +1,5 @@
 import type { OpsRegion } from "@/lib/regions";
+import { buildAskBrief, howtoReply, situationReply, type AskGrounding } from "./brief";
 import {
   GREETING_EN,
   GREETING_ES,
@@ -26,6 +27,8 @@ export type FaqTopic =
   | "help"
   | "greeting"
   | "scope";
+
+export type AskFaqRegion = Pick<OpsRegion, "executiveSummary" | "label" | "incidentName">;
 
 const FAQ_COPY: Record<Exclude<FaqTopic, "situation" | "greeting">, string> = {
   layers:
@@ -62,6 +65,13 @@ const FAQ_ES: Record<Exclude<FaqTopic, "situation" | "greeting" | "scope">, stri
 
 function has(q: string, pattern: RegExp): boolean {
   return pattern.test(q);
+}
+
+/** How-it-works phrases. They stay on the help topic so existing classify checks hold, and the reply is the brief how-to. */
+export function isHowtoQuestion(question: string): boolean {
+  return /\b(?:expl[ií]\w*|c[oó]mo\s+funciona\w*|funciona\w*|how does (?:this|it|ops) work|explain this)\b/i.test(
+    question,
+  );
 }
 
 export function classifyAskQuestion(question: string): FaqTopic {
@@ -101,7 +111,7 @@ export function classifyAskQuestion(question: string): FaqTopic {
   if (
     has(
       q,
-      /\bsituation\b|\bsituaci[oó]n\b|\bsummary\b|\bstatus\b|\bincident\b|\bincidente\b|\bhappening\b|\bwatch\b|\bfire\b|\bincendio\b/,
+      /\bsituation\b|\bsituaci[oó]n\b|\bsummary\b|\bstatus\b|\bincident\b|\bincidente\b|\bhappening\b|\bgoing on\b|\bpasando\b|\bwatch\b|\bfire\b|\bincendio\b|\bqu[eé]\s+est[aá]\s+pasando\b/,
     )
   ) {
     return "situation";
@@ -109,7 +119,7 @@ export function classifyAskQuestion(question: string): FaqTopic {
   if (
     has(
       q,
-      /\bhelp\b|\bayuda\b|\bhow do i\b|\bhow to\b|\buse ops\b|\bc[oó]mo uso\b|\bexplic\w*|\bc[oó]mo funciona\w*|\bfunciona\w*/,
+      /\bhelp\b|\bayuda\b|\bhow do i\b|\bhow to\b|\buse ops\b|\bc[oó]mo uso\b|\bexpl[ií]\w*|\bc[oó]mo funciona\w*|\bfunciona\w*|\bhow does (?:this|it|ops) work\b|\bexplain this\b/,
     )
   ) {
     return "help";
@@ -123,17 +133,19 @@ function greetingAnswer(question: string, lang: AskReplyLanguage): string {
   return lang === "es" ? GREETING_ES : GREETING_EN;
 }
 
-/** Static FAQ used when both model keys are empty or the live calls fail. */
-export function answerFaq(question: string, region: Pick<OpsRegion, "executiveSummary" | "label">): string {
+/** Static FAQ used when both model keys are empty, the live calls fail, or a situation / how-to intent answers from the brief. */
+export function answerFaq(
+  question: string,
+  region: AskFaqRegion,
+  grounding?: AskGrounding,
+): string {
   const topic = classifyAskQuestion(question);
   const lang = askReplyLanguage(question);
   if (topic === "greeting") return greetingAnswer(question, lang);
   if (topic === "scope") return lang === "es" ? REFUSE_ES : FAQ_COPY.scope;
-  if (topic === "situation") {
-    return lang === "es"
-      ? `Resumen del incidente: ${region.executiveSummary}`
-      : region.executiveSummary;
-  }
+  const brief = buildAskBrief({ region, grounding });
+  if (topic === "situation") return situationReply(brief, lang);
+  if (topic === "help" && isHowtoQuestion(question)) return howtoReply(brief, lang);
   if (topic === "region") {
     return lang === "es"
       ? `${FAQ_ES.region} Región actual: ${region.label}. ${region.executiveSummary}`

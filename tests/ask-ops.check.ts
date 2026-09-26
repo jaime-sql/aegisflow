@@ -6,6 +6,14 @@ import { DEEPSEEK_MODEL, OPENAI_MODEL } from "../src/lib/agents/runtime";
 import { handleAsk } from "../src/lib/ask/answer";
 import { answerFaq, classifyAskQuestion } from "../src/lib/ask/faq";
 import {
+  ASK_BRIEF_MAX_CHARS,
+  askBriefFactsFromIncident,
+  formatAskBrief,
+  buildAskBrief,
+} from "../src/lib/ask/brief";
+import { askReplyLanguage } from "../src/lib/ask/language";
+import { cloneFixtureIncident } from "../src/lib/fixtures/aegisfire-01";
+import {
   ASK_TOPIC_LINE,
   GREETING_EN,
   GREETING_ES,
@@ -296,6 +304,109 @@ assert.equal(classifyAskQuestion(mixed), "greeting");
 assert.match(answerFaq(mixed, sv), /hablo español/);
 assert.doesNotMatch(answerFaq("I need a house", sv), /bedroom|real estate|español/i);
 
+const briefAgents = [
+  { title: "ALPHA", summary: "alpha line" },
+  { title: "BETA", summary: "beta line" },
+  { title: "GAMMA", summary: "gamma line" },
+  { title: "DELTA", summary: "delta line should drop" },
+];
+const liveFacts = {
+  firmsHonesty: "DEMO FIXTURE" as const,
+  firmsAge: "4m ago",
+  windHonesty: "fallback" as const,
+  predicted: "present" as const,
+  predictedSim: true,
+};
+const grounding = { agents: briefAgents, facts: liveFacts };
+
+assert.equal(askReplyLanguage("hey necesito que me expliques"), "es");
+assert.equal(askReplyLanguage("hey"), "en");
+assert.equal(classifyAskQuestion("hey necesito que me expliques"), "help");
+assert.equal(classifyAskQuestion("explicame que esta pasando"), "situation");
+assert.equal(classifyAskQuestion("explicame que esta pasando?"), "situation");
+assert.equal(classifyAskQuestion("qué está pasando"), "situation");
+assert.equal(classifyAskQuestion("que esta pasando"), "situation");
+assert.equal(classifyAskQuestion("what's going on"), "situation");
+assert.equal(classifyAskQuestion("what is happening"), "situation");
+assert.equal(classifyAskQuestion("como funciona esto"), "help");
+assert.equal(classifyAskQuestion("cómo funciona esto"), "help");
+assert.equal(classifyAskQuestion("hola necesito que me explicas como funciona esto"), "help");
+assert.equal(classifyAskQuestion("necesito que me expliques"), "help");
+assert.equal(classifyAskQuestion("how does this work"), "help");
+assert.equal(classifyAskQuestion("explain this"), "help");
+assert.equal(classifyAskQuestion("¿Cómo funcionan las capas?"), "layers");
+
+const pasando = answerFaq("explicame que esta pasando", sv, grounding);
+assert.match(pasando, /Te cuento lo que está pasando/);
+assert.match(pasando, /Resumen del incidente/);
+assert.match(pasando, /El Salvador WUI watch/);
+assert.match(pasando, /FIRMS · 4m ago · DEMO FIXTURE/);
+assert.match(pasando, /Wind · fallback/);
+assert.match(pasando, /cono Predicted está en el mapa/);
+assert.match(pasando, /SIM, no es satélite/);
+assert.match(pasando, /Agentes: ALPHA/);
+assert.match(pasando, /GAMMA/);
+assert.doesNotMatch(pasando, /DELTA/);
+assert.doesNotMatch(pasando, /Puedo ayudarte con este incidente|I can only assist|Please ask about|Map layers are Hotspots/);
+
+const como = answerFaq("como funciona esto", sv, grounding);
+assert.match(como, /Así funciona esto en El Salvador \/ WUI/);
+assert.match(como, /leyenda/);
+assert.match(como, /linaje/i);
+assert.match(como, /Ack y Assign son solo para Manager/);
+assert.match(como, /Región·fuentes/);
+assert.match(como, /DEMO FIXTURE/);
+assert.doesNotMatch(como, /Puedo ayudarte con este incidente|I can only assist|Map layers are Hotspots|Here's how this works/);
+
+const holaComo = answerFaq("hola necesito que me explicas como funciona esto", sv, grounding);
+assert.match(holaComo, /Así funciona esto/);
+assert.match(holaComo, /leyenda/);
+assert.doesNotMatch(holaComo, /Puedo ayudarte con este incidente|I can help with this incident/);
+
+const heyEs = answerFaq("hey necesito que me expliques", sv);
+assert.match(heyEs, /Así funciona esto/);
+assert.doesNotMatch(heyEs, /I can help with this incident|Hi — I'm here/);
+
+const goingOn = answerFaq("what's going on", sv, grounding);
+assert.match(goingOn, /Here's what is happening on El Salvador \/ WUI/);
+assert.match(goingOn, /El Salvador WUI watch/);
+assert.match(goingOn, /DEMO FIXTURE/);
+assert.match(goingOn, /Wind · fallback/);
+assert.doesNotMatch(goingOn, /Resumen del incidente|Te cuento|Así funciona|Puedo ayudarte/);
+
+const howEn = answerFaq("how does this work", sv, grounding);
+assert.match(howEn, /Here's how this works on El Salvador \/ WUI/);
+assert.match(howEn, /legend toggles/);
+assert.match(howEn, /Region·feeds/);
+assert.match(howEn, /DEMO FIXTURE/);
+assert.doesNotMatch(howEn, /Así funciona|leyenda|Resumen del incidente/);
+
+const explainEn = answerFaq("explain this", sv);
+assert.match(explainEn, /Here's how this works/);
+assert.match(explainEn, /Lineage/);
+assert.doesNotMatch(explainEn, /Así funciona|leyenda/);
+
+const fixtureFacts = askBriefFactsFromIncident(cloneFixtureIncident());
+assert.equal(fixtureFacts.firmsHonesty, "DEMO FIXTURE");
+assert.equal(fixtureFacts.windHonesty, "fallback");
+assert.equal(fixtureFacts.predicted, "present");
+assert.equal(fixtureFacts.predictedSim, true);
+const packed = formatAskBrief(
+  buildAskBrief({
+    region: sv,
+    grounding: { agents: briefAgents, facts: fixtureFacts },
+  }),
+);
+assert.match(packed, /Ask brief/);
+assert.match(packed, /DEMO FIXTURE/);
+assert.match(packed, /Wind · fallback/);
+assert.match(packed, /How-to EN/);
+assert.match(packed, /How-to ES/);
+assert.match(packed, /ALPHA/);
+assert.doesNotMatch(packed, /DELTA/);
+assert.ok(packed.length <= ASK_BRIEF_MAX_CHARS);
+assert.doesNotMatch(packed, /embedding|pinecone|vector store|notion/i);
+
 const enPrompt = askSystemPrompt("How do layers work?");
 assert.match(enPrompt, /Language lock: write the entire answer in English/);
 assert.match(enPrompt, /Ack and Assign/);
@@ -573,6 +684,103 @@ async function modelPickAndFailover() {
   );
 }
 
+async function situationBriefSkipsModel() {
+  let calls = 0;
+  const fetchFn: typeof fetch = async () => {
+    calls += 1;
+    throw new Error("situation and how-to intents must not call the model");
+  };
+  const env = { OPENAI_API_KEY: "sk-test", DEEPSEEK_API_KEY: "ds-test" };
+  const situation = await handleAsk({
+    session: viewer,
+    question: "explicame que esta pasando",
+    regionId: "el-salvador",
+    agents,
+    brief: liveFacts,
+    env,
+    fetch: fetchFn,
+  });
+  const situationBody = await jsonBody(situation);
+  assert.equal(calls, 0);
+  assert.equal(situationBody.ok, true);
+  assert.equal(situationBody.sim, true);
+  assert.equal(situationBody.source, "faq");
+  assert.match(String(situationBody.answer), /Te cuento lo que está pasando/);
+  assert.match(String(situationBody.answer), /FIRMS · 4m ago · DEMO FIXTURE/);
+  assert.match(String(situationBody.answer), /Wind · fallback/);
+  assert.match(String(situationBody.answer), /ALPHA/);
+  assert.match(String(situationBody.answer), /El Salvador WUI watch/);
+  assert.doesNotMatch(
+    String(situationBody.answer),
+    /Puedo ayudarte con este incidente|I can only assist|Please ask about/,
+  );
+  assert.match(cookieJar(situation), /aegisflow_ask_n=1/);
+
+  const howto = await handleAsk({
+    session: manager,
+    question: "como funciona esto",
+    regionId: "el-salvador",
+    agents,
+    brief: liveFacts,
+    env,
+    fetch: fetchFn,
+  });
+  const howtoBody = await jsonBody(howto);
+  assert.equal(calls, 0);
+  assert.match(String(howtoBody.answer), /Así funciona esto/);
+  assert.match(String(howtoBody.answer), /leyenda/);
+  assert.match(String(howtoBody.answer), /DEMO FIXTURE/);
+  assert.doesNotMatch(String(howtoBody.answer), /Map layers are Hotspots|I can help with this incident/);
+
+  const english = await handleAsk({
+    session: viewer,
+    question: "what's going on",
+    regionId: "el-salvador",
+    brief: liveFacts,
+    env,
+    fetch: fetchFn,
+  });
+  const englishBody = await jsonBody(english);
+  assert.match(String(englishBody.answer), /Here's what is happening/);
+  assert.match(String(englishBody.answer), /DEMO FIXTURE/);
+  assert.doesNotMatch(String(englishBody.answer), /Resumen del incidente|Te cuento/);
+
+  const explain = await handleAsk({
+    session: viewer,
+    question: "explain this",
+    regionId: "cascade",
+    env,
+    fetch: fetchFn,
+  });
+  const explainBody = await jsonBody(explain);
+  assert.match(String(explainBody.answer), /Here's how this works on Cascade/);
+  assert.doesNotMatch(String(explainBody.answer), /Así funciona|leyenda/);
+  assert.equal(calls, 0);
+
+  const grounded = llmFetch(() => ({ status: 200, content: "Toggle the legend." }));
+  const layers = await handleAsk({
+    session: viewer,
+    question: "How do layers work?",
+    regionId: "el-salvador",
+    agents,
+    brief: liveFacts,
+    env: { OPENAI_API_KEY: "sk-test" },
+    fetch: grounded.fetchFn,
+  });
+  const layersBody = await jsonBody(layers);
+  assert.equal(layersBody.source, "openai");
+  const user = grounded.captured[0]!.body.messages?.[1]?.content ?? "";
+  assert.match(user, /Ask brief/);
+  assert.match(user, /FIRMS · 4m ago · DEMO FIXTURE/);
+  assert.match(user, /Wind · fallback/);
+  assert.match(user, /Predicted cone: on map · SIM · not satellite/);
+  assert.match(user, /How-to ES/);
+  assert.match(user, /How-to EN/);
+  assert.match(user, /ALPHA/);
+  assert.doesNotMatch(user, /DELTA/);
+  assert.ok(user.length < 8000);
+}
+
 async function askSessionCap() {
   const probe = llmFetch(() => ({ status: 200, content: "Use the region picker." }));
   let cookie = "";
@@ -736,6 +944,7 @@ function uiWiring() {
   assert.match(drawer, /Escape/);
   assert.match(drawer, /Close Ask Ops/);
   assert.match(drawer, /slice\(0, 3\)/);
+  assert.match(drawer, /askBriefFactsFromIncident/);
   assert.match(drawer, /shouldAutoSpeak/);
   assert.match(drawer, /voiceOrigin/);
   assert.match(drawer, /speechRecognitionCtor/);
@@ -814,6 +1023,12 @@ function uiWiring() {
   assert.match(docs, /#1E2A40/);
   assert.match(docs, /#E2E8F0/);
   assert.match(docs, /Idioma del micrófono/);
+  assert.match(docs, /not a vector index/i);
+  assert.match(docs, /explicame que esta pasando/);
+  assert.match(docs, /does not add ElevenLabs speech-to-text/);
+
+  const briefSrc = readFileSync("src/lib/ask/brief.ts", "utf8");
+  assert.doesNotMatch(briefSrc, /embedding|pinecone|vector store|notion|elevenlabs/i);
 
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /tests\/ask-ops\.check\.ts/);
@@ -822,6 +1037,7 @@ function uiWiring() {
 async function main() {
   await faqWhenKeysEmpty();
   await modelPickAndFailover();
+  await situationBriefSkipsModel();
   await askSessionCap();
   await speakMissingKeyIsSim();
   await speakCapsSkipUpstream();

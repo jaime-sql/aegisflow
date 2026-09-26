@@ -1,6 +1,7 @@
 import { canAskOps, type OpsRole } from "@/lib/auth/roles";
 import { resolveOpsRegion } from "@/lib/regions";
-import { answerFaq } from "./faq";
+import { buildAskBrief, formatAskBrief, type AskGrounding } from "./brief";
+import { answerFaq, classifyAskQuestion, isHowtoQuestion } from "./faq";
 import { presentAskAnswer } from "./present";
 import { clampQuestion } from "./help";
 import {
@@ -27,6 +28,8 @@ export type AskDeps = {
   question?: unknown;
   regionId?: unknown;
   agents?: unknown;
+  /** Live FIRMS / Wind / Predicted honesty from the Ops client. */
+  brief?: unknown;
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
   cookie?: string | null;
@@ -88,18 +91,40 @@ export async function handleAsk(deps: AskDeps): Promise<Response> {
     }
 
     const env = deps.env ?? process.env;
+    const grounding: AskGrounding = { agents: deps.agents, facts: deps.brief };
+    const regionFacts = {
+      executiveSummary: region.executiveSummary,
+      label: region.label,
+      incidentName: region.incidentName,
+    };
+    const topic = classifyAskQuestion(question);
+    // Situation and how-it-works answers come from the brief, not a free-form model reply.
+    if (topic === "situation" || (topic === "help" && isHowtoQuestion(question))) {
+      return jsonResponse(
+        {
+          ok: true,
+          sim: true,
+          limited: false,
+          source: "faq",
+          model: null,
+          answer: answerFaq(question, regionFacts, grounding),
+        },
+        [askCountCookie(count + 1)],
+      );
+    }
+
     const messages = buildAskMessages({
       question,
       regionLabel: region.label,
       incidentName: region.incidentName,
       executiveSummary: region.executiveSummary,
       agents: deps.agents,
+      brief: formatAskBrief(buildAskBrief({ region, grounding })),
     });
     const completion = await completeAskText(messages, env, deps.fetch ?? fetch);
-    const regionFacts = { executiveSummary: region.executiveSummary, label: region.label };
     const answer = completion.text
-      ? presentAskAnswer(question, completion.text, regionFacts)
-      : answerFaq(question, regionFacts);
+      ? presentAskAnswer(question, completion.text, regionFacts, grounding)
+      : answerFaq(question, regionFacts, grounding);
     const sim = completion.source === "faq" || !completion.text;
 
     return jsonResponse(

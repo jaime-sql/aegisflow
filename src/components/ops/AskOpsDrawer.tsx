@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { IncidentEvent } from "@/lib/schema";
 import { opsAskSpeakUrl, opsAskUrl } from "@/lib/base-path";
+import { askBriefFactsFromIncident } from "@/lib/ask/brief";
 import { ASK_QUESTION_MAX } from "@/lib/ask/help";
 import {
   ASK_LIMIT_HINT,
@@ -69,7 +70,10 @@ export function AskOpsDrawer({
   onClose,
 }: {
   open: boolean;
-  incident: Pick<IncidentEvent, "name" | "region" | "agents">;
+  incident: Pick<
+    IncidentEvent,
+    "name" | "region" | "agents" | "hotspots" | "wind" | "feedHealth"
+  >;
   configured: boolean;
   onClose: () => void;
 }) {
@@ -350,6 +354,7 @@ export function AskOpsDrawer({
             title: agent.title,
             summary: agent.summary,
           })),
+          brief: askBriefFactsFromIncident(incident),
         }),
       });
       const data = (await res.json()) as AskPayload;
